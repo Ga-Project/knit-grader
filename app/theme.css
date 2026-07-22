@@ -1,0 +1,79 @@
+/* knit-grader — 製品の「顔」層（globals.css の後に読み込み、:root トークンを上書き）
+ *
+ * 世界観: 「製図台に広げた編み図方眼（生成りの方眼紙）」。
+ *   - accent = 弁柄（べんがら／酸化鉄）色のテラコッタ。社寺や木材の防腐に使われた
+ *     "保存・長持ち" の伝統顔料＝この製品の核「壊れない」の直喩であり自然染めの温かみ。
+ *   - neutral = 生成り（parchment）。毛糸・麻の温かみを画面全域に薄く行き渡らせる。
+ *   - 角は crisp（製図の精度）。数字は等幅で桁が揺れない＝安定・信頼。
+ *
+ * 個性は「トークン上書き（このファイル）」＋「製品固有レイアウト（product.css）」で出す。
+ * 共通部品（.btn / .field / .card 等）の見た目はトークンのまま流用する。
+ */
+
+:root {
+  /* === accent: 弁柄テラコッタ === */
+  --accent-h: 20;
+  --accent-s: 55%;
+  --accent-l: 40%; /* light: white/accent ≈ 5.7:1（AA・通常文字）*/
+  --accent-fg: #fdf9f6; /* accent 上の文字（light・温白）*/
+
+  /* === neutral: 生成り（暖色・低彩度）=== */
+  --neutral-hue: 38;
+  --neutral-chroma: 9%;
+
+  /* === 形: crisp（製図台の精度）=== */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  /* === 密度: 数値の多いツール。詰めすぎない === */
+  --density: 0.96;
+
+  /* === タイポ: 見出しは sans 太のまま。工芸的明朝は hero 大見出しだけに限定 === */
+  --font-craft:
+    "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
+
+  /* === error を crimson 寄りにして accent(橙)と色相分離（色覚多様性・accent 誤認防止）===
+     ※ エラーは色だけで伝えず、必ずアイコン＋文言＋境界線を併用する。*/
+  --err: #cc2244; /* h≈348・light bg 上で AA */
+  --err-tint: hsl(348 74% 96%);
+
+  /* === success（「保存済み」「復元しました」「解除済み ✓」＝差別化の中心）===
+     globals 既定の --ok は --ok-tint 上で AA を割る(≈3.2:1)。深い緑へ落として ≥4.5 を確保。
+     （light: --ok(#0b6b46) on --ok-tint ≈ 5.7:1）*/
+  --ok: #0b6b46;
+
+  /* 方眼セルの基準サイズ（product.css が参照） */
+  --cell: 15px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* このファイルの :root{--accent-l:40%} は globals の dark 持ち上げ(@media)より
+       後に読み込まれ同一詳細度で勝ってしまう。dark では accent を明るいテラコッタへ
+       持ち上げ直し、その上に暗い暖色文字を載せて light/dark 双方で AA を満たす。
+       （dark: accent文字/bg ≈ 7.7:1・accent-fg/accent ≈ 6.4:1 で AA 余裕）*/
+    --accent-l: 66%;
+    --accent-fg: hsl(var(--neutral-hue) 42% 12%);
+    --err: #ff6b81; /* 暗背景で読める明るい crimson */
+    --err-tint: hsl(348 45% 18%);
+    /* dark の --ok-tint(暗い緑)上で読める明るい緑へ持ち上げ直す（≈7.8:1）*/
+    --ok: hsl(157 65% 62%);
+  }
+}
+
+/* テーマトグルで root に data-theme が付く環境向けの明示上書き（保険）。 */
+:root[data-theme="dark"] {
+  --accent-l: 66%;
+  --accent-fg: hsl(var(--neutral-hue) 42% 12%);
+  --err: #ff6b81;
+  --err-tint: hsl(348 45% 18%);
+  --ok: hsl(157 65% 62%);
+}
+:root[data-theme="light"] {
+  --accent-l: 40%;
+  --accent-fg: #fdf9f6;
+  --err: #cc2244;
+  --err-tint: hsl(348 74% 96%);
+  --ok: #0b6b46;
+}

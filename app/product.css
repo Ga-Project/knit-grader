@@ -1,0 +1,411 @@
+/* knit-grader — 製品固有レイアウト層
+ *
+ * globals.css（土台トークン・基本部品）と theme.css（顔＝色/形/タイポ）の上に、
+ * この製品の骨格（製図台の編み図方眼ワークスペース・編み地プレビュー）を組む。
+ * 基本部品（.btn / .field / .card / .badge）はトークンのまま流用し、ここでは
+ * 「この製品にしかない構造」だけを新規クラスで定義する。
+ */
+
+/* ===== hero-band: フルスクリーン hero にせず、ツールをすぐ触れる位置に置く ===== */
+.hero-band {
+  padding-block: var(--sp-12) var(--sp-6);
+  position: relative;
+  isolation: isolate;
+}
+.hero-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    62% 80% at 12% 0%,
+    hsl(var(--accent-h) var(--accent-s) 52% / 0.1),
+    transparent 68%
+  );
+}
+.hero-band h1 {
+  font-family: var(--font-craft);
+  font-weight: var(--fw-bold);
+  font-size: clamp(1.9rem, 5.2vw, 2.9rem);
+  letter-spacing: var(--tracking-tight);
+  max-width: 20ch;
+}
+/* 見出しの決め台詞を弁柄アクセントで強調する。
+   globals の .accent-text は .hero h1 限定セレクタ＋グラデ終端が AA 未達(2.5:1)。
+   この製品は hero-band を使うので、両セレクタをソリッド --accent(≈5.6:1・AA)で上書きする。 */
+.hero h1 .accent-text,
+.hero-band h1 .accent-text {
+  background: none;
+  -webkit-background-clip: initial;
+  background-clip: initial;
+  color: var(--accent);
+}
+.hero-band .hero-lead {
+  margin-top: var(--sp-4);
+}
+/* 核となる3つの約束（competitor の弱点への直接的アンチテーゼ） */
+.promise-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin-top: var(--sp-5);
+  padding: 0;
+  list-style: none;
+}
+.promise-row li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-soft);
+}
+.promise-row .stitch-mark {
+  color: var(--accent);
+  flex: none;
+}
+
+/* ===== ワークスペース（主役・製図台）===== */
+.workspace-section {
+  padding-block: var(--sp-8) var(--sp-12);
+}
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: var(--sp-6);
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 入力パネル（生成り紙面・desktop は sticky で結果を見ながら調整） */
+.ws-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+@media (min-width: 821px) {
+  .ws-panel {
+    position: sticky;
+    top: calc(var(--header-h) + var(--sp-4));
+  }
+}
+.ws-panel__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.ws-panel__legend {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.ws-panel__legend small {
+  font-weight: var(--fw-medium);
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+/* 2 入力を横並び（目数/段数、幅/丈） */
+.field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+.field .suffix-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.field .suffix-input input {
+  padding-right: 3.2em;
+}
+.field .suffix-input .suffix {
+  position: absolute;
+  right: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* 保存状態インジケータ（差別化の核＝「壊れない・消えない」の可視化） */
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  transition:
+    color var(--transition),
+    background var(--transition),
+    border-color var(--transition);
+}
+.save-status.is-saved {
+  color: var(--ok);
+  background: var(--ok-tint);
+  border-color: transparent;
+}
+.save-status.is-editing {
+  color: var(--text-soft);
+}
+.save-status .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.ws-panel__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+/* ===== 方眼キャンバス（結果図＋編み地プレビュー）===== */
+.ws-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/* 大結果: 目数／段数（等幅で桁が揺れない＝精度・安定の信号） */
+.result-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+.result-figure {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  padding: var(--sp-5);
+  text-align: center;
+}
+.result-figure__label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.result-figure__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  font-size: clamp(2.4rem, 7vw, 3.4rem);
+  font-weight: var(--fw-black);
+  line-height: 1.05;
+  color: var(--text);
+  margin-top: var(--sp-1);
+}
+.result-figure__unit {
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+  margin-left: 0.15em;
+  font-weight: var(--fw-semibold);
+}
+.result-figure.is-empty .result-figure__num {
+  color: var(--text-dim);
+}
+
+/* 方眼シート（graph paper）＋編み地矩形 */
+.knit-stage {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  /* 方眼: 細罫(1セル)＋主罫(5セル毎) を重ねる */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--border) 0 1px,
+      transparent 1px var(--cell)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--border) 0 1px,
+      transparent 1px var(--cell)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      var(--border-strong) 0 1px,
+      transparent 1px calc(var(--cell) * 5)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--border-strong) 0 1px,
+      transparent 1px calc(var(--cell) * 5)
+    );
+  background-position: 0 0;
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-8);
+  overflow: hidden;
+}
+/* グリッド上に実寸比例で描く編み地（幅:丈 の比を保つ）。px は JS が注入。 */
+.swatch-figure {
+  position: relative;
+  border: 2px solid var(--accent);
+  background: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.1);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  place-items: center;
+  transition:
+    width var(--transition-slow),
+    height var(--transition-slow);
+}
+.swatch-figure__tag {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--accent);
+  background: var(--bg);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-xs);
+  white-space: nowrap;
+}
+/* 空状態（入力前）: 方眼だけ＋案内 */
+.knit-stage.is-empty {
+  color: var(--text-dim);
+}
+.knit-stage .empty-state {
+  padding: var(--sp-8) var(--sp-4);
+}
+.swatch-caption {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+  text-align: center;
+}
+.swatch-caption b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 信頼3点（カードグリッドが正当な補助セクション）===== */
+.trust-points {
+  padding-block: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+.trust-grid {
+  display: grid;
+  gap: var(--sp-5);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  margin-top: var(--sp-8);
+}
+
+/* ===== 使い方3ステップ ===== */
+.step-list {
+  padding-block: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+.steps {
+  display: grid;
+  gap: var(--sp-6);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  margin-top: var(--sp-8);
+  counter-reset: step;
+}
+.step {
+  position: relative;
+  padding-left: calc(var(--sp-8) + var(--sp-4));
+}
+.step__no {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: var(--fw-black);
+}
+.step h3 {
+  margin-top: 0;
+}
+
+/* ===== FAQ（native details）===== */
+.faq {
+  padding-block: var(--sp-12) var(--sp-16);
+  border-top: 1px solid var(--border);
+}
+.faq__list {
+  margin-top: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.faq__item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.faq__item summary {
+  cursor: pointer;
+  padding: var(--sp-4) var(--sp-5);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.faq__item summary::-webkit-details-marker {
+  display: none;
+}
+.faq__item summary::after {
+  content: "＋";
+  color: var(--accent);
+  font-weight: var(--fw-bold);
+  transition: transform var(--transition);
+}
+.faq__item[open] summary::after {
+  content: "−";
+}
+.faq__item summary:hover {
+  background: var(--surface-2);
+}
+.faq__body {
+  padding: 0 var(--sp-5) var(--sp-5);
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+}
+
+/* ===== V ステッチ glyph（brand / promise / アイコン）===== */
+.stitch-mark {
+  display: inline-block;
+  vertical-align: middle;
+}
+.brand-mark .stitch-mark {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--accent-fg);
+}
