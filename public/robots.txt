@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ga-project.github.io/knit-grader/sitemap.xml

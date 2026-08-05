@@ -38,10 +38,34 @@ export const metadata: Metadata = {
   alternates: { canonical: SITE_URL },
 };
 
+// 検索エンジン向けの構造化データ（schema.org）。無料のWebユーティリティであることを
+// 明示し、リッチリザルト（アプリ情報・無料表示）の対象にする。パスに依存せず有効。
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "ニットゲージ計算",
+  url: SITE_URL,
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Any",
+  inLanguage: "ja",
+  description,
+  isAccessibleForFree: true,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "JPY" },
+  featureList: [
+    "10cm角ゲージと仕上がり寸法から必要目数・段数を同時計算",
+    "入力はブラウザに自動保存（登録不要）",
+  ],
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja">
       <body>
+        <script
+          type="application/ld+json"
+          // 静的な自前オブジェクトのみを埋め込む（外部入力なし＝XSSリスクなし）。
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         {children}
         {/* アクセス解析（cookieless・秘密キー不要）。GOATCOUNTER_CODE は publish 時に実コードへ。 */}
         <Script
