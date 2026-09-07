@@ -50,6 +50,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # 共有カードの PNG は手元で焼いてコミットする。SVG だけ直して焼き直しを忘れると
+      # カードが黙って古いままになるため、公開前にここで突き合わせて落とす。
+      - run: pnpm og:check
       - run: pnpm build
         env:
           PAGES_BASE_PATH: /knit-grader

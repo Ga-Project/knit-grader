@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img"
+     aria-label="ニットゲージ計算 — ゲージが合わなくても、目数と段数がすぐ決まる。">
+  <!-- knit-grader の共有カード（1200x630 / summary_large_image）。
+       意匠は実ページから写す。カードで見せたものが着地先に無い状態を作らない:
+         見出し    = app/page.tsx の h1 と同一文言。accent は「語」にかける（.accent-text と同じ）
+         結果の表示 = product.css .result-figure（ラベル=accent・数字=--text の等幅 black）
+         保存の表示 = product.css .save-status.is-saved（ピル・--ok-tint 地・7px ドット・「保存済み」）
+         色        = theme.css の accent 弁柄 hsl(20 55% 40%) / neutral 生成り hue38 / --ok #0b6b46
+         角        = theme.css --radius 8px（--radius-lg は製品内で未使用なので使わない）
+         方眼      = product.css の製図台。--cell:15px の 3 倍(45px)で敷く
+                     （2 倍だとタイムライン縮小時に線が消えて方眼に見えない）
+       文字サイズは 504px 幅（X のタイムライン相当・約0.42倍）で潰れないことを下限にする。
+       左カラムは x=720 の伝票と接するため、文言を伸ばすときは幅に注意する。
+       design/og.svg が正本。public/og.png は `pnpm og` で焼き直す。 -->
+  <defs>
+    <pattern id="cell" width="45" height="45" patternUnits="userSpaceOnUse">
+      <path d="M45 0 H0 V45" fill="none" stroke="hsl(38 20% 90%)" stroke-width="1"/>
+    </pattern>
+    <pattern id="major" width="225" height="225" patternUnits="userSpaceOnUse">
+      <path d="M225 0 H0 V225" fill="none" stroke="hsl(38 20% 78%)" stroke-width="1"/>
+    </pattern>
+    <!-- hero-band::before と同じ弁柄の差し込み光 -->
+    <radialGradient id="glow" cx="12%" cy="0%" r="78%">
+      <stop offset="0%"  stop-color="hsl(20 55% 52%)" stop-opacity="0.13"/>
+      <stop offset="68%" stop-color="hsl(20 55% 52%)" stop-opacity="0"/>
+    </radialGradient>
+    <!-- メリヤスの目の V（app/StitchMark.tsx と同一パス・12x12 系）。
+         ブランド記号と約束の箇条書きにだけ使う（保存状態はピルで表すので流用しない）。 -->
+    <g id="stitch">
+      <path d="M1.4 2.2 L6 8.4 L10.6 2.2" fill="none" stroke="currentColor"
+            stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3.2 5.6 L6 9.6 L8.8 5.6" fill="none" stroke="currentColor"
+            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+    </g>
+  </defs>
+
+  <rect width="1200" height="630" fill="hsl(38 30% 98%)"/>
+  <rect width="1200" height="630" fill="url(#cell)"/>
+  <rect width="1200" height="630" fill="url(#major)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <!-- 弁柄の綴じ罫（左端） -->
+  <rect x="0" y="0" width="10" height="630" fill="hsl(20 55% 40%)"/>
+
+  <!-- ===== 左: 名乗り・見出し・約束 ===== -->
+  <g transform="translate(78 96)" color="hsl(20 55% 40%)">
+    <g transform="translate(0 -14) scale(2.4)"><use href="#stitch"/></g>
+    <text x="42" y="9" font-family="'Hiragino Sans','Noto Sans JP',sans-serif"
+          font-size="25" font-weight="700" letter-spacing="0.08em"
+          fill="hsl(20 55% 40%)">ニットゲージ計算</text>
+  </g>
+
+  <g font-family="'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif"
+     font-size="54" font-weight="700" letter-spacing="-0.02em">
+    <text x="78" y="196" fill="hsl(38 9% 13%)">ゲージが合わなくても、</text>
+    <text x="78" y="264" fill="hsl(20 55% 40%)">目数と段数が</text>
+    <text x="78" y="332" fill="hsl(20 55% 40%)">すぐ決まる。</text>
+  </g>
+
+  <g font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="27" font-weight="600"
+     fill="hsl(38 10% 30%)" color="hsl(20 55% 40%)">
+    <g transform="translate(78 412)">
+      <g transform="translate(0 -14) scale(2.2)"><use href="#stitch"/></g>
+      <text x="40" y="8">自動保存で消えない</text>
+    </g>
+    <g transform="translate(78 464)">
+      <g transform="translate(0 -14) scale(2.2)"><use href="#stitch"/></g>
+      <text x="40" y="8">あとから何度でも編集できる</text>
+    </g>
+    <g transform="translate(78 516)">
+      <g transform="translate(0 -14) scale(2.2)"><use href="#stitch"/></g>
+      <text x="40" y="8">登録不要・ブラウザだけで無料</text>
+    </g>
+  </g>
+
+  <!-- ===== 右: 計算の伝票。入力を上に、結果を .result-figure と同じ色配分で下に ===== -->
+  <g transform="translate(720 140)">
+    <rect x="0" y="0" width="410" height="340" rx="8"
+          fill="hsl(38 30% 98%)" stroke="hsl(38 18% 82%)" stroke-width="1.5"/>
+
+    <g font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="22" fill="hsl(38 8% 42%)">
+      <text x="28" y="52">ゲージ <tspan font-family="ui-monospace,'SF Mono',Menlo,Consolas,monospace"
+            font-weight="600" fill="hsl(38 10% 30%)">22</tspan>目 × <tspan
+            font-family="ui-monospace,'SF Mono',Menlo,Consolas,monospace"
+            font-weight="600" fill="hsl(38 10% 30%)">30</tspan>段 /10cm</text>
+      <text x="28" y="88">身幅 <tspan font-family="ui-monospace,'SF Mono',Menlo,Consolas,monospace"
+            font-weight="600" fill="hsl(38 10% 30%)">50</tspan>cm ／ 着丈 <tspan
+            font-family="ui-monospace,'SF Mono',Menlo,Consolas,monospace"
+            font-weight="600" fill="hsl(38 10% 30%)">60</tspan>cm</text>
+    </g>
+
+    <line x1="28" y1="114" x2="382" y2="114" stroke="hsl(38 20% 90%)" stroke-width="1.5"/>
+
+    <!-- .result-figure: ラベル=accent(tracking-wide) / 数字=--text の等幅 black -->
+    <g text-anchor="middle">
+      <g font-family="'Hiragino Sans','Noto Sans JP',sans-serif" font-size="20" font-weight="700"
+         letter-spacing="0.06em" fill="hsl(20 55% 40%)">
+        <text x="116" y="160">必要な目数</text>
+        <text x="294" y="160">必要な段数</text>
+      </g>
+      <g font-family="ui-monospace,'SF Mono',Menlo,Consolas,monospace" font-size="54"
+         font-weight="800" fill="hsl(38 9% 13%)">
+        <text x="116" y="222">110<tspan font-family="'Hiragino Sans','Noto Sans JP',sans-serif"
+              font-size="22" font-weight="600" fill="hsl(38 10% 30%)">目</tspan></text>
+        <text x="294" y="222">180<tspan font-family="'Hiragino Sans','Noto Sans JP',sans-serif"
+              font-size="22" font-weight="600" fill="hsl(38 10% 30%)">段</tspan></text>
+      </g>
+    </g>
+
+    <line x1="28" y1="256" x2="382" y2="256" stroke="hsl(38 20% 90%)" stroke-width="1.5"/>
+
+    <!-- .save-status.is-saved と同じピル（--ok-tint 地・境界線なし・7px ドット） -->
+    <g transform="translate(139 284)">
+      <rect x="0" y="0" width="132" height="36" rx="999" fill="hsl(157 60% 95%)"/>
+      <circle cx="20" cy="18" r="3.5" fill="#0b6b46"/>
+      <text x="36" y="25" font-family="'Hiragino Sans','Noto Sans JP',sans-serif"
+            font-size="20" font-weight="600" fill="#0b6b46">保存済み</text>
+    </g>
+  </g>
+</svg>

@@ -6,11 +6,16 @@ import "./globals.css";
 import "./theme.css";
 // 製品固有レイアウト（製図台ワークスペース）。
 import "./product.css";
-import { SITE_URL, GOATCOUNTER_CODE } from "./config";
+import { SITE_URL, GOATCOUNTER_CODE, OG_IMAGE_URL } from "./config";
 
 const title = "ニットゲージ計算｜目数・段数を同時計算・自動保存で消えない電卓";
 const description =
   "編み物のゲージ（10cm角の目数・段数）と仕上がり寸法から、必要な目数・段数をその場で同時に計算。入力はブラウザに自動保存され、あとから何度でも編集できます。登録不要・ブラウザですぐ使えます。";
+
+// 画像が読み込めない環境・読み上げ環境でもカードの中身が伝わるようにする。
+const ogImageAlt =
+  "ニットゲージ計算の共有カード。「ゲージが合わなくても、目数と段数がすぐ決まる。」" +
+  "10cm角で22目×30段のゲージから、身幅50cmは110目、着丈60cmは180段と算出した例。";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -34,6 +39,22 @@ export const metadata: Metadata = {
     locale: "ja_JP",
     url: SITE_URL,
     siteName: "knit-grader",
+    images: [
+      {
+        url: OG_IMAGE_URL,
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: ogImageAlt,
+      },
+    ],
+  },
+  // 画像付きで共有されたときに小さなサムネイルではなく大きなカードで表示させる。
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: [{ url: OG_IMAGE_URL, alt: ogImageAlt }],
   },
   alternates: { canonical: SITE_URL },
 };

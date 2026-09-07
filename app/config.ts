@@ -11,3 +11,7 @@ export const STORAGE_KEY = "knit-grader:v1";
 
 /** GoatCounter（cookieless・秘密キー不要）のコード。ga-project.goatcounter.com に集約（path で製品別に集計）。 */
 export const GOATCOUNTER_CODE = "ga-project";
+
+/** 共有カード（og:image / summary_large_image）。design/og.svg を焼いた public/og.png。
+ *  クローラは絶対URLしか辿れないので、SITE_URL 基準で解決して確定させる。 */
+export const OG_IMAGE_URL = new URL("og.png", SITE_URL).toString();
