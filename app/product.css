@@ -409,3 +409,183 @@
   height: 1.1rem;
   color: var(--accent-fg);
 }
+
+/* ===== ガイドページ（/gauge/）===== */
+/* セクションの縦リズムはトップの信頼3点・使い方と同じ（罫線で区切る方眼紙の段） */
+.guide-section {
+  padding-block: var(--sp-12);
+  border-top: 1px solid var(--border);
+}
+.guide-section h2 {
+  margin-top: var(--sp-2);
+}
+.guide-cta {
+  padding-bottom: var(--sp-16);
+}
+
+/* パンくず（ホームへ戻る導線・タッチ 44px） */
+.breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+}
+.breadcrumb li + li::before {
+  content: "/";
+  color: var(--border-strong);
+}
+.breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* 計算式（製図の注記のように方眼の上へ置く・等幅数字） */
+.formula-box {
+  margin-top: var(--sp-5);
+  padding: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+}
+.formula {
+  margin: 0;
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+.formula + .formula {
+  margin-top: var(--sp-2);
+}
+.formula-box__note {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+}
+.calc-line {
+  margin-top: var(--sp-1);
+  font-family: var(--font-mono);
+  color: var(--text-soft);
+}
+.calc-line b {
+  color: var(--text);
+  font-weight: var(--fw-black);
+}
+.guide-result {
+  margin-top: var(--sp-6);
+}
+
+/* 表（早見表・比較表）: 方眼の罫・等幅数字・右揃え */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  background: var(--surface);
+}
+.data-table caption {
+  caption-side: top;
+  text-align: left;
+  padding: var(--sp-3) var(--sp-4);
+  font-weight: var(--fw-semibold);
+  color: var(--text-soft);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.data-table th,
+.data-table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table th:last-child,
+.data-table td:last-child {
+  border-right: 0;
+}
+.data-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+.data-table thead th {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-weight: var(--fw-semibold);
+  text-align: right;
+}
+.data-table thead th:first-child,
+.data-table tbody th {
+  text-align: left;
+}
+.data-table tbody th {
+  font-weight: var(--fw-semibold);
+  color: var(--accent);
+  background: var(--surface);
+}
+.data-table td {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.table-wrap {
+  margin-top: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.compare-table tbody th {
+  white-space: normal;
+}
+
+/* 横スクロール領域（先頭列を固定し、どの目数の行か見失わない） */
+.chart-scroll {
+  margin-top: var(--sp-5);
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  -webkit-overflow-scrolling: touch;
+}
+.chart-scroll .data-table caption {
+  position: sticky;
+  left: 0;
+}
+.quick-chart thead th:first-child,
+.quick-chart tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 1px 0 0 var(--border);
+}
+.quick-chart thead th:first-child {
+  background: var(--surface-2);
+}
+.chart-scroll__hint {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+/* トップ FAQ からガイドへの導線 */
+.faq__more {
+  margin-top: var(--sp-5);
+  font-size: var(--fs-sm);
+}
+.faq__more a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--fw-semibold);
+}

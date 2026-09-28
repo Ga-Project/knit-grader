@@ -1,0 +1,313 @@
+// knit-grader — ガイド「ゲージから目数・段数を出す方法」（/gauge/）。
+// 本文の数字（実例・早見表・FAQ）はすべて lib/gauge-guide（= lib/grading の計算関数）から導出し、
+// 手書きの数値を置かない。内部リンクは next/link（basePath 配信でサブパスを自動付与）。
+import type { Metadata } from "next";
+import Link from "next/link";
+import { SiteHeader, SiteFooter } from "../chrome";
+import { SITE_URL, OG_IMAGE } from "../config";
+import {
+  GAUGE_GUIDE_PATH,
+  buildBreadcrumbJsonLd,
+  buildFaqPageJsonLd,
+  buildFormulaExample,
+  buildGaugeFaqs,
+  buildMismatchExample,
+  buildQuickChart,
+  formatCm,
+  formatDecimal,
+  serializeJsonLd,
+} from "@/lib/gauge-guide";
+import type { CalcStep } from "@/lib/gauge-guide";
+import { QuickChart } from "./QuickChart";
+
+const PAGE_URL = new URL(GAUGE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
+const PAGE_NAME = "ゲージから目数・段数を出す方法";
+
+const title = "ゲージから目数・段数を出す方法｜計算式と早見表｜ニットゲージ計算";
+const description =
+  "編み物のゲージ（10cm角の目数・段数）から、幅と丈に必要な目数・段数を出す計算式を実例つきで解説。10cmあたりの目数×幅の早見表と、ゲージが指定と合わないときの目数の出し直し方もまとめました。";
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: { canonical: PAGE_URL },
+  // Metadata は layout と deep-merge されないため、og:image を含めて全項目をここで明示する。
+  openGraph: {
+    title,
+    description,
+    type: "article",
+    locale: "ja_JP",
+    url: PAGE_URL,
+    siteName: "knit-grader",
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
+  },
+};
+
+const formula = buildFormulaExample();
+const chart = buildQuickChart();
+const mismatch = buildMismatchExample();
+const faqs = buildGaugeFaqs();
+
+const faqJsonLd = buildFaqPageJsonLd(faqs);
+const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+  { name: "ニットゲージ計算", url: SITE_URL },
+  { name: PAGE_NAME, url: PAGE_URL },
+]);
+
+/**
+ * 計算結果の数字。data-calc に「10cmあたり,寸法cm」を残し、ビルド成果物の検査
+ * （scripts/verify-export.mjs）が表示値と countForLength の一致を確かめられるようにする。
+ */
+function Count({ step }: { step: CalcStep }) {
+  return <b data-calc={`${step.per10cm},${step.lengthCm}`}>{step.count}</b>;
+}
+
+/** 計算式の途中経過「48 ÷ 10 × 22 ＝ 105.6 → 106」を1行で表す。 */
+function CalcLine({ step, unit }: { step: CalcStep; unit: string }) {
+  const rounded = step.raw !== step.count;
+  return (
+    <p className="calc-line tabular">
+      {step.lengthCm} ÷ 10 × {formatDecimal(step.per10cm)} ＝{" "}
+      {formatDecimal(step.raw)}
+      {rounded ? (
+        <>
+          {" "}
+          → 四捨五入して <Count step={step} />
+          {unit}
+        </>
+      ) : (
+        <>
+          {" "}
+          ＝ <Count step={step} />
+          {unit}
+        </>
+      )}
+    </p>
+  );
+}
+
+export default function GaugeGuide() {
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        // 自前の静的データのみ（外部入力なし）。"<" は serializeJsonLd でエスケープ済み。
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+      />
+      <a className="skip-link" href="#main">
+        本文へスキップ
+      </a>
+      <SiteHeader />
+
+      <main id="main" tabIndex={-1} style={{ outline: "none" }}>
+        <section className="hero-band">
+          <div className="container container-narrow">
+            <nav className="breadcrumb" aria-label="パンくずリスト">
+              <ol>
+                <li>
+                  <Link href="/">ニットゲージ計算</Link>
+                </li>
+                <li aria-current="page">{PAGE_NAME}</li>
+              </ol>
+            </nav>
+            <span className="eyebrow">ゲージの使い方</span>
+            <h1>{PAGE_NAME}</h1>
+            <p className="hero-lead">
+              試し編みの10cm角に入る目数と段数（ゲージ）が分かれば、編みたい幅と丈に必要な目数・段数は
+              割り算と掛け算で決まります。計算式と実例、早見表、ゲージが指定と合わないときの出し直し方をまとめました。
+            </p>
+            <div className="hero-actions">
+              <Link className="btn btn-primary" href="/">
+                計算ツールで目数・段数を出す
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="guide-section" aria-labelledby="idea-heading">
+          <div className="container container-narrow">
+            <span className="eyebrow">考え方</span>
+            <h2 id="idea-heading">ゲージは「1cmに何目入るか」の手がかり</h2>
+            <p>
+              ゲージは、試し編みの10cm四方に入る目数（横）と段数（縦）です。10cmあたりの目数が分かれば、
+              1cmあたりに入る目数も分かります。あとは編みたい幅が何cmあるかを掛け合わせれば、必要な目数が決まります。
+              段数も同じで、丈（縦の長さ）と10cmあたりの段数から求めます。
+            </p>
+            <p>
+              同じ糸・同じ針でも編む人や編み方で目の大きさは変わるため、編み図の数字をそのまま使う前に、
+              自分の試し編みを測ってゲージを確かめるのが確実です。
+            </p>
+          </div>
+        </section>
+
+        <section className="guide-section" aria-labelledby="formula-heading">
+          <div className="container container-narrow">
+            <span className="eyebrow">計算式</span>
+            <h2 id="formula-heading">計算式と実例</h2>
+            <div className="formula-box">
+              <p className="formula">
+                目数 ＝ 幅（cm）÷ 10 × 10cmあたりの目数
+              </p>
+              <p className="formula">
+                段数 ＝ 丈（cm）÷ 10 × 10cmあたりの段数
+              </p>
+              <p className="formula-box__note">
+                割り切れないときは、最後に四捨五入して整数にします。
+              </p>
+            </div>
+
+            <h3>
+              実例：ゲージ{formula.gauge.stitches}目・{formula.gauge.rows}段、幅
+              {formula.stitches.lengthCm}cm・丈{formula.rows.lengthCm}cm
+            </h3>
+            <p>目数（幅{formula.stitches.lengthCm}cm）</p>
+            <CalcLine step={formula.stitches} unit="目" />
+            <p>段数（丈{formula.rows.lengthCm}cm）</p>
+            <CalcLine step={formula.rows} unit="段" />
+
+            <div className="result-pair guide-result">
+              <div className="result-figure">
+                <div className="result-figure__label">目数</div>
+                <div className="result-figure__num">
+                  {formula.stitches.count}
+                  <span className="result-figure__unit">目</span>
+                </div>
+              </div>
+              <div className="result-figure">
+                <div className="result-figure__label">段数</div>
+                <div className="result-figure__num">
+                  {formula.rows.count}
+                  <span className="result-figure__unit">段</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="guide-section" aria-labelledby="chart-heading">
+          <div className="container container-narrow">
+            <span className="eyebrow">早見表</span>
+            <h2 id="chart-heading">10cmあたりの目数と幅から見る早見表</h2>
+            <p>
+              左の列が10cmあたりの目数、上の行が幅です。交わるところが必要な目数（四捨五入）です。
+              段数を見るときは「目」を「段」、幅を丈と読み替えてください。
+            </p>
+            <QuickChart chart={chart} />
+          </div>
+        </section>
+
+        <section className="guide-section" aria-labelledby="mismatch-heading">
+          <div className="container container-narrow">
+            <span className="eyebrow">ゲージが合わないとき</span>
+            <h2 id="mismatch-heading">自分のゲージが指定と違うとき</h2>
+            <p>
+              編み図の目数・段数は、その編み図が指定するゲージで編んだときの数です。自分のゲージが指定と違うまま
+              同じ目数・段数で編むと、仕上がり寸法が変わります。自分のゲージで目数・段数を出し直せば、
+              仕上がり寸法を指定どおりに保てます。
+            </p>
+
+            <div className="table-wrap">
+              <table className="data-table compare-table">
+                <caption id="mismatch-caption">
+                  幅{mismatch.widthCm}cm・丈{mismatch.lengthCm}cmを編む場合の目数・段数
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">ゲージ</th>
+                    <th scope="col">目数</th>
+                    <th scope="col">段数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">
+                      指定（{mismatch.patternGauge.stitches}目・
+                      {mismatch.patternGauge.rows}段）
+                    </th>
+                    <td>
+                      <Count step={mismatch.pattern.stitches} />
+                      目
+                    </td>
+                    <td>
+                      <Count step={mismatch.pattern.rows} />
+                      段
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">
+                      自分（{mismatch.myGauge.stitches}目・
+                      {mismatch.myGauge.rows}段）
+                    </th>
+                    <td>
+                      <Count step={mismatch.mine.stitches} />
+                      目
+                    </td>
+                    <td>
+                      <Count step={mismatch.mine.rows} />
+                      段
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p>
+              指定の{mismatch.pattern.stitches.count}目・{mismatch.pattern.rows.count}段のまま自分のゲージで編むと、
+              幅は{formatCm(mismatch.asIs.widthCm)}、丈は{formatCm(mismatch.asIs.lengthCm)}になります。自分のゲージで出し直した
+              {mismatch.mine.stitches.count}目・{mismatch.mine.rows.count}段で編めば、幅{mismatch.widthCm}cm・丈
+              {mismatch.lengthCm}cmに仕上がります。
+            </p>
+            <p>
+              ただし出し直しで保てるのは寸法で、編み地の詰まり具合は指定とは変わります。針や糸を替えてゲージを
+              指定に近づける方法もあります。どちらを優先するかは作品に合わせて決めてください。
+            </p>
+          </div>
+        </section>
+
+        <section className="faq" aria-labelledby="faq-heading">
+          <div className="container container-narrow">
+            <span className="eyebrow">よくある質問</span>
+            <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}>
+              ゲージと目数計算のよくある質問
+            </h2>
+            <div className="faq__list">
+              {faqs.map((f) => (
+                <details className="faq__item" key={f.q}>
+                  <summary>{f.q}</summary>
+                  <div className="faq__body">{f.a}</div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="guide-section guide-cta" aria-labelledby="cta-heading">
+          <div className="container container-narrow">
+            <h2 id="cta-heading">自分のゲージで計算する</h2>
+            <p>
+              計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、
+              あとから何度でも編集できます。
+            </p>
+            <div className="hero-actions">
+              <Link className="btn btn-primary" href="/">
+                計算ツールを開く
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <SiteFooter />
+    </>
+  );
+}

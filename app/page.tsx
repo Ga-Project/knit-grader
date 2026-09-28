@@ -1,5 +1,7 @@
 // knit-grader — トップ（静的な導入・信頼・使い方・FAQ ＋ 対話ツール GaugeTool）。
 // セマンティックランドマーク（header / main / footer）、h1 は1つ、skip-link を持つ。
+import Link from "next/link";
+import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
 import { GaugeTool } from "./GaugeTool";
 import { SiteHeader, SiteFooter } from "./chrome";
 import { StitchMark } from "./StitchMark";
@@ -158,6 +160,11 @@ export default function Home() {
                 </details>
               ))}
             </div>
+            <p className="faq__more">
+              <Link href={GAUGE_GUIDE_PATH}>
+                ゲージから目数・段数を出す方法（計算式と早見表）
+              </Link>
+            </p>
           </div>
         </section>
       </main>
