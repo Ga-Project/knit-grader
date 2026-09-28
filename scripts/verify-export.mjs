@@ -152,7 +152,12 @@ function resolvesInOut(absUrl) {
   const u = new URL(absUrl);
   if (u.origin !== SITE_ORIGIN) return false;
   if (u.pathname !== BASE_PATH && !u.pathname.startsWith(`${BASE_PATH}/`)) return false;
-  const rel = decodeURIComponent(u.pathname.slice(BASE_PATH.length)).replace(/^\//, "");
+  let rel;
+  try {
+    rel = decodeURIComponent(u.pathname.slice(BASE_PATH.length)).replace(/^\//, "");
+  } catch {
+    return false; // 不正なパーセントエンコード（呼び出し元が位置付きで失敗にする）
+  }
   const target = rel === "" || rel.endsWith("/") ? join(rel, "index.html") : rel;
   return existsSync(join(OUT_DIR, target));
 }
@@ -203,29 +208,38 @@ function checkLinks(rel, html) {
     }
   }
   for (const { tag, name, value, navigation } of refs) {
-    const label = `<${tag} ${name}="${value}">`;
-    if (value.trim() === "") {
+    const label = `<${tag} ${name}="${JSON.stringify(value).slice(1, -1)}">`;
+    // ブラウザと同じ解釈に揃える: 前後の空白は無視され、途中のタブ・改行は取り除かれる
+    // （" javascript:" や "java\tscript:" も javascript: として働く）。以降の判定はすべてこの値と解析結果で行う。
+    const cleaned = value.trim().replace(/[\t\n\r]/g, "");
+    if (cleaned === "") {
       fail(`${rel}: 空のリンク ${label}`);
       continue;
     }
-    if (value.startsWith("#") || /^(mailto|tel):/i.test(value)) continue;
-    if (/^data:/i.test(value)) {
-      if (!navigation && tag === "script") fail(`${rel}: data: の script ${label}`);
+    const abs = parseUrl(rel, label, cleaned, pageUrl);
+    if (!abs) continue;
+    const protocol = abs.protocol;
+    if (protocol === "mailto:" || protocol === "tel:") {
+      if (!navigation) fail(`${rel}: ${protocol} を読み込み系の属性に使っている ${label}`);
       continue;
     }
-    if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^https?:/i.test(value)) {
-      fail(`${rel}: 想定外のスキーム ${label}`);
-      continue;
-    }
-    // ルート相対（/ 始まり・// 始まりでない）は basePath の内側でなければならない
-    if (value.startsWith("/") && !value.startsWith("//")) {
-      if (value !== BASE_PATH && !value.startsWith(`${BASE_PATH}/`) && !value.startsWith(`${BASE_PATH}?`) && !value.startsWith(`${BASE_PATH}#`)) {
-        fail(`${rel}: basePath(${BASE_PATH}) の外へ出る内部リンク ${label}`);
-        continue;
+    if (protocol === "data:") {
+      if (tag === "script" || tag === "iframe" || tag === "object" || tag === "embed") {
+        fail(`${rel}: data: URL の ${tag} ${label}`);
       }
+      continue;
     }
-    // 相対・ルート相対・// 始まり・絶対URL をすべて配信URLとして解決して判定する
-    const abs = new URL(value, pageUrl);
+    if (protocol !== "https:" && protocol !== "http:") {
+      fail(`${rel}: 許可していないスキーム ${protocol} ${label}`);
+      continue;
+    }
+    // 同じページ内のアンカー
+    if (cleaned.startsWith("#")) continue;
+    // ルート相対（/ 始まり・// 始まりでない）は basePath の内側でなければならない
+    if (cleaned.startsWith("/") && !cleaned.startsWith("//") && !isSelf(abs)) {
+      fail(`${rel}: basePath(${BASE_PATH}) の外へ出る内部リンク ${label}`);
+      continue;
+    }
     if (isSelf(abs)) {
       if (!resolvesInOut(abs.toString())) fail(`${rel}: リンク先が out/ に無い ${label}（→ ${abs}）`);
       continue;
@@ -234,10 +248,33 @@ function checkLinks(rel, html) {
       fail(`${rel}: 同じオリジンだが basePath(${BASE_PATH}) の外 ${label}（→ ${abs}）`);
       continue;
     }
-    // 外部
-    if (!navigation && !LOAD_HOST_ALLOWLIST.has(abs.hostname)) {
+    // 外部: 遷移リンクは https/http を許す。読み込み系は許可したホストの https のみ。
+    if (!navigation && (protocol !== "https:" || !LOAD_HOST_ALLOWLIST.has(abs.hostname))) {
       fail(`${rel}: 許可していない外部の読み込み ${label}`);
     }
+  }
+}
+
+/** URL を解析する。解析できない値は、どのファイルのどの値かを示して失敗にする（検査全体は止めない）。 */
+function parseUrl(rel, label, value, base) {
+  try {
+    return new URL(value, base);
+  } catch (e) {
+    fail(`${rel}: 解析できない URL ${label}（${e instanceof Error ? e.message : String(e)}）`);
+    return null;
+  }
+}
+
+/** og:image / twitter:image が自サイトの絶対URLで、out/ の実ファイルに解決できるか。 */
+function checkImageMeta(rel, what, value) {
+  if (!/^https:\/\//.test(value)) {
+    fail(`${rel}: ${what} が絶対URL（https）でない: ${value}`);
+    return;
+  }
+  const abs = parseUrl(rel, `${what}="${value}"`, value, SITE_URL);
+  if (!abs) return;
+  if (!isSelf(abs) || !resolvesInOut(abs.toString())) {
+    fail(`${rel}: ${what} が out/ の実ファイルに解決できない: ${value}`);
   }
 }
 
@@ -257,6 +294,8 @@ function checkCommon(rel, html) {
   ]) {
     if (list.length > 1) fail(`${rel}: ${what} が ${list.length} 本（1本であること）`);
   }
+  for (const v of metaValues(html, "property", "og:image")) checkImageMeta(rel, "og:image", v);
+  for (const v of metaValues(html, "name", "twitter:image")) checkImageMeta(rel, "twitter:image", v);
 }
 
 // ---------------------------------------------------------------------------
