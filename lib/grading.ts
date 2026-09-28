@@ -31,9 +31,25 @@ export function parseMeasure(input: string): number | null {
   return value;
 }
 
+/**
+ * 10cm あたりの目数(または段数)と寸法(cm)から、四捨五入する前の値を求める。
+ * 計算式の実体はここだけに置く（ツールとガイドの数字が食い違わないようにするため）。
+ */
+export function rawCountForLength(per10cm: number, lengthCm: number): number {
+  return (lengthCm / 10) * per10cm;
+}
+
 /** 10cm あたりの目数(または段数)と寸法(cm)から、必要な目数(または段数)を求める。 */
 export function countForLength(per10cm: number, lengthCm: number): number {
-  return Math.round((lengthCm / 10) * per10cm);
+  return Math.round(rawCountForLength(per10cm, lengthCm));
+}
+
+/**
+ * 10cm あたりの目数(または段数)と、実際に編む目数(または段数)から、仕上がる寸法(cm)を求める。
+ * countForLength の逆算。ゲージが違うまま同じ目数で編んだときの仕上がりを示すのに使う。
+ */
+export function lengthForCount(per10cm: number, count: number): number {
+  return (count / per10cm) * 10;
 }
 
 /** ゲージと仕上がり寸法から、目数・段数を同時に求める。 */

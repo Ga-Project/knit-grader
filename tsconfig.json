@@ -8,6 +8,7 @@
     "moduleResolution": "Bundler",
     "allowJs": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "incremental": true,
     "strict": true,
     "noImplicitOverride": true,
