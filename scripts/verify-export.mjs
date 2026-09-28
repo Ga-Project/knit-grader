@@ -318,6 +318,26 @@ function checkGaugePage(rel, html) {
 
   checkQuickChart(rel, html);
   checkMarkers(rel, html);
+  checkFinishedClaims(rel, html);
+}
+
+/**
+ * 本文で仕上がり寸法を言い切る箇所（「◯cmに仕上がります」「◯cmになります」「幅は◯cm、丈は」）が、
+ * 計算結果の表示（data-len の要素）であること。入力値をそのまま書いた寸法を見逃さない。
+ * FAQ（details 内）は文字列として単体テストで検査しているので対象外。
+ */
+function checkFinishedClaims(rel, html) {
+  const body = stripNonContent(html).replace(/<details\b.*?<\/details>/gs, "");
+  const claims = [
+    ...body.matchAll(/([\d.]+cm)((?:<\/span>)?)(?:<!--.*?-->)*(、丈は|に仕上がり|になり)/g),
+  ];
+  if (claims.length === 0) fail(`${rel}: 仕上がり寸法の記述が見つからない`);
+  for (const m of claims) {
+    const before = body.slice(Math.max(0, m.index - 80), m.index);
+    if (!m[2] || !/data-len="[^"]*"[^>]*>[^<]*$/.test(before)) {
+      fail(`${rel}: 仕上がり寸法「${m[1]}${m[3]}…」が計算結果（data-len）から出ていない`);
+    }
+  }
 }
 
 /** 早見表: 見出し（10cmあたりの目数・幅）から計算した値と、表示されているセルの値を突き合わせる。 */
