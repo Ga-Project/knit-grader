@@ -6,16 +6,15 @@ import "./globals.css";
 import "./theme.css";
 // 製品固有レイアウト（製図台ワークスペース）。
 import "./product.css";
-import { SITE_URL, GOATCOUNTER_CODE, OG_IMAGE } from "./config";
+import { SITE_URL, GOATCOUNTER_CODE, HOME_TITLE, HOME_DESCRIPTION } from "./config";
+import { serializeJsonLd } from "@/lib/json-ld";
 
-const title = "ニットゲージ計算｜目数・段数を同時計算・自動保存で消えない電卓";
-const description =
-  "編み物のゲージ（10cm角の目数・段数）と仕上がり寸法から、必要な目数・段数をその場で同時に計算。入力はブラウザに自動保存され、あとから何度でも編集できます。登録不要・ブラウザですぐ使えます。";
-
+// 既定値（各ページが pageMetadata で上書きする）。canonical と og:url はここに置かない
+// （置くと定義し忘れたページがトップを正規URLと名乗るため。app/seo.ts 参照）。
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title,
-  description,
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
   applicationName: "knit-grader",
   keywords: [
     "ニット",
@@ -27,23 +26,6 @@ export const metadata: Metadata = {
     "編み図",
     "スワッチ",
   ],
-  openGraph: {
-    title,
-    description,
-    type: "website",
-    locale: "ja_JP",
-    url: SITE_URL,
-    siteName: "knit-grader",
-    images: [OG_IMAGE],
-  },
-  // 画像付きで共有されたときに小さなサムネイルではなく大きなカードで表示させる。
-  twitter: {
-    card: "summary_large_image",
-    title,
-    description,
-    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
-  },
-  alternates: { canonical: SITE_URL },
 };
 
 // 検索エンジン向けの構造化データ（schema.org）。無料のWebユーティリティであることを
@@ -56,7 +38,7 @@ const jsonLd = {
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Any",
   inLanguage: "ja",
-  description,
+  description: HOME_DESCRIPTION,
   isAccessibleForFree: true,
   offers: { "@type": "Offer", price: "0", priceCurrency: "JPY" },
   featureList: [
@@ -71,8 +53,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <script
           type="application/ld+json"
-          // 静的な自前オブジェクトのみを埋め込む（外部入力なし＝XSSリスクなし）。
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          // 静的な自前オブジェクトのみ（外部入力なし）。"<" は serializeJsonLd でエスケープする。
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
         {children}
         {/* アクセス解析（cookieless・秘密キー不要）。GOATCOUNTER_CODE は publish 時に実コードへ。 */}

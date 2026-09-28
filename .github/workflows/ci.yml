@@ -1,0 +1,48 @@
+name: CI
+
+# プルリクエストで、公開ワークフロー（pages.yml）と同じ検査とビルド検査を走らせる。
+# 公開（deploy）はしない。deploy は pages.yml の main への push のみ。
+# concurrency は PR ごとに分け、本番の "pages" グループとは共有しない（本番 deploy を取り消さないため）。
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint / Typecheck / Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  build:
+    name: Build (static export) + verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm og:check
+      - run: pnpm build
+        env:
+          PAGES_BASE_PATH: /knit-grader
+      - run: pnpm verify:export

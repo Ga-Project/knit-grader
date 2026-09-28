@@ -30,3 +30,8 @@ export const OG_IMAGE = {
   type: "image/png",
   alt: OG_IMAGE_ALT,
 } as const;
+
+/** トップ（計算ツール）のタイトルと説明。layout の既定値とトップの pageMetadata で共有する。 */
+export const HOME_TITLE = "ニットゲージ計算｜目数・段数を同時計算・自動保存で消えない電卓";
+export const HOME_DESCRIPTION =
+  "編み物のゲージ（10cm角の目数・段数）と仕上がり寸法から、必要な目数・段数をその場で同時に計算。入力はブラウザに自動保存され、あとから何度でも編集できます。登録不要・ブラウザですぐ使えます。";

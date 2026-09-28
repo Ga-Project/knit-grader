@@ -1,10 +1,19 @@
 // knit-grader — トップ（静的な導入・信頼・使い方・FAQ ＋ 対話ツール GaugeTool）。
 // セマンティックランドマーク（header / main / footer）、h1 は1つ、skip-link を持つ。
+import type { Metadata } from "next";
 import Link from "next/link";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
+import { HOME_TITLE, HOME_DESCRIPTION } from "./config";
+import { pageMetadata } from "./seo";
 import { GaugeTool } from "./GaugeTool";
 import { SiteHeader, SiteFooter } from "./chrome";
 import { StitchMark } from "./StitchMark";
+
+export const metadata: Metadata = pageMetadata({
+  path: "/",
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
+});
 
 const promises = [
   "壊れない（自動保存で消えない）",
@@ -87,8 +96,9 @@ export default function Home() {
               <span className="accent-text">目数と段数がすぐ決まる。</span>
             </h1>
             <p className="hero-lead">
-              10cm角のゲージと仕上がり寸法を入れるだけ。必要な目数・段数をその場で同時に計算します。
-              入力は自動保存で消えず、あとから何度でも編集できます。
+              {
+                "10cm角のゲージと仕上がり寸法を入れるだけ。必要な目数・段数をその場で同時に計算します。入力は自動保存で消えず、あとから何度でも編集できます。"
+              }
             </p>
             <ul className="promise-row">
               {promises.map((p) => (

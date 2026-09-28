@@ -7,7 +7,7 @@ import { SiteHeader, SiteFooter } from "./chrome";
 
 export const metadata: Metadata = {
   title: "ページが見つかりません — ニットゲージ計算",
-  // 404 は検索インデックス対象外にする。
+  // 404 は検索インデックス対象外にし、canonical は出さない（layout も canonical を持たない）。
   robots: { index: false, follow: false },
 };
 
@@ -27,8 +27,9 @@ export default function NotFound() {
               ページが<span className="accent-text">見つかりません</span>
             </h1>
             <p className="hero-lead">
-              お探しのページは見つかりませんでした。移動・削除されたか、URL
-              が誤っている可能性があります。
+              {
+                "お探しのページは見つかりませんでした。移動・削除されたか、URL が誤っている可能性があります。"
+              }
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">

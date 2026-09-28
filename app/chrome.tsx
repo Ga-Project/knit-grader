@@ -3,6 +3,7 @@
 // 素の <a href="/…"> は basePath が付かず、プロジェクトページで 404 になる）。
 import Link from "next/link";
 import { StitchMark } from "./StitchMark";
+import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
 
 export function SiteHeader() {
   return (
@@ -29,9 +30,14 @@ export function SiteFooter() {
         <p style={{ marginTop: "var(--sp-2)" }}>
           入力した内容はお使いのブラウザ内にのみ保存され、サーバーへ送信されません。
         </p>
-        <p style={{ marginTop: "var(--sp-4)" }}>
-          <Link href="/privacy/">プライバシーについて</Link>
-        </p>
+        <ul className="footer-links">
+          <li>
+            <Link href={GAUGE_GUIDE_PATH}>ゲージから目数・段数を出す方法</Link>
+          </li>
+          <li>
+            <Link href="/privacy/">プライバシーについて</Link>
+          </li>
+        </ul>
         <p style={{ marginTop: "var(--sp-4)" }}>© ニットゲージ計算</p>
       </div>
     </footer>
