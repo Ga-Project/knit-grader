@@ -1,7 +1,7 @@
 name: Deploy to GitHub Pages
 
 # 公開前ゲート → ビルド → Pages 公開を1つの workflow で直列化する。
-# secret-scan が落ちたら build は skip され、Pages には何も公開されない
+# secret-scan または check（lint/型検査/テスト）が落ちたら build は skip され、Pages には何も公開されない
 
 on:
   push:
@@ -38,9 +38,29 @@ jobs:
       - name: Scan full history
         run: gitleaks detect --no-banner --redact
 
+  # ---------------------------------------------------------------------------
+  # lint / 型検査 / 単体テスト。build はこの job も needs にするため、
+  # どれかが落ちると公開に進まない。
+  # ---------------------------------------------------------------------------
+  check:
+    name: Lint / Typecheck / Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
   build:
     name: Build (static export)
-    needs: secret-scan # スキャン通過が前提。fail 時は skip され公開されない。
+    # スキャンと検査の通過が前提。どちらかが fail すると skip され公開されない。
+    needs: [secret-scan, check]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,6 +76,9 @@ jobs:
       - run: pnpm build
         env:
           PAGES_BASE_PATH: /knit-grader
+      # 書き出された HTML そのものを検査する（canonical・og:image・構造化データ・
+      # basePath の外へ出る内部リンク・sitemap・計測タグ・表の数字）。落ちたら公開しない。
+      - run: pnpm verify:export
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out
