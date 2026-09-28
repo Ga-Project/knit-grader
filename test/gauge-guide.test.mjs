@@ -74,6 +74,44 @@ test("calcSentence: 割り切れるときは＝、割り切れないときは途
   assert.ok(s.includes("四捨五入して157段"), s);
 });
 
+test("calcSentence: 小数第2位までの入力を網羅しても、文の主張は検査関数と常に一致する", () => {
+  let checked = 0;
+  // ゲージ 10.00〜40.00、寸法 1.00〜120.00 を小数第2位の刻みを含む格子で走査する
+  for (let pc = 1000; pc <= 4000; pc += 37) {
+    for (let lc = 100; lc <= 12000; lc += 113) {
+      const per = pc / 100;
+      const len = lc / 100;
+      const step = calcStep(per, len);
+      const text = calcSentence(step, "目");
+      const { found, errors } = findEquationErrors(text);
+      assert.equal(found, 1, text);
+      assert.deepEqual(errors, [], text);
+      // 式中の入力値は丸めずに出す
+      assert.ok(text.startsWith(`${len}÷10×${per}`), text);
+      checked += 1;
+    }
+  }
+  assert.ok(checked > 8000);
+});
+
+test("calcParts: 途中値は四捨五入すると目数に一致する最小桁で、丸めたときだけ「≈」", () => {
+  const p = calcParts(calcStep(21.9, 48.16));
+  assert.equal(`${p.expression} ${p.relation} ${p.rawText} → 四捨五入して ${p.count}目`,
+    "48.16 ÷ 10 × 21.9 ≈ 105.47 → 四捨五入して 105目");
+  // 入力値は丸めない（47.95 を 48 と表示しない）
+  assert.ok(calcParts(calcStep(22, 47.95)).expression.startsWith("47.95 "));
+  // 途中値がそのまま表示できるときは「＝」
+  assert.equal(calcParts(calcStep(22, 48)).relation, "＝");
+  assert.equal(calcParts(calcStep(22, 48)).rawText, "105.6");
+});
+
+test("findEquationErrors: 丸めの自己矛盾（105.47 を 105.5 と表示して 105目）を検出する", () => {
+  assert.ok(findEquationErrors("48.16÷10×21.9≈105.5を四捨五入して105目").errors.length > 0);
+  assert.ok(findEquationErrors("48.2÷10×21.9≈105.5を四捨五入して105目").errors.length > 0);
+  assert.ok(findEquationErrors("48.16÷10×21.9＝105.47を四捨五入して105目").errors.length > 0);
+  assert.deepEqual(findEquationErrors("48.16÷10×21.9≈105.47を四捨五入して105目").errors, []);
+});
+
 test("findEquationErrors: 偽の等式・隠れた四捨五入・誤った途中値を検出する", () => {
   assert.equal(findEquationErrors("56÷10×28＝157段").errors.length > 0, true);
   assert.equal(findEquationErrors("56÷10×28＝156.8を四捨五入して158段").errors.length > 0, true);

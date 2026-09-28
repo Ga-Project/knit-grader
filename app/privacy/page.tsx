@@ -38,7 +38,7 @@ export default function Privacy() {
           </div>
         </section>
       </main>
-      <SiteFooter />
+      <SiteFooter current="privacy" />
     </>
   );
 }

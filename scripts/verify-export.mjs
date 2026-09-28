@@ -33,8 +33,11 @@ const BASE_PATH = new URL(SITE_URL).pathname.replace(/\/$/, "");
 const SITE_ORIGIN = new URL(SITE_URL).origin;
 const GAUGE_URL = new URL(GAUGE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 
-/** 外部から読み込んでよい script のホスト（cookieless のアクセス解析のみ）。 */
-const SCRIPT_HOST_ALLOWLIST = new Set(["gc.zgo.at"]);
+/**
+ * 外部から読み込んでよいホスト（script・stylesheet・preload・iframe・img 等の読み込み系すべて）。
+ * 現状の公開物で外部から読み込んでいるのは cookieless のアクセス解析（gc.zgo.at）だけ。
+ */
+const LOAD_HOST_ALLOWLIST = new Set(["gc.zgo.at"]);
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -103,10 +106,12 @@ function textNodes(html) {
     .filter((t) => t.trim() !== "");
 }
 
+/** 属性を読む。二重引用符・単一引用符・引用符なしのいずれの書き方も値として読む。 */
 function parseAttrs(s) {
   const attrs = {};
-  for (const m of s.matchAll(/([\w:-]+)(?:="([^"]*)")?/g)) {
-    attrs[m[1].toLowerCase()] = m[2] === undefined ? "" : decodeEntities(m[2]);
+  for (const m of s.matchAll(/([^\s"'<>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g)) {
+    const value = m[2] ?? m[3] ?? m[4];
+    attrs[m[1].toLowerCase()] = value === undefined ? "" : decodeEntities(value);
   }
   return attrs;
 }
@@ -159,56 +164,79 @@ function resolvesInOut(absUrl) {
 const CJK = "[\\u3001-\\u303f\\u3040-\\u30ff\\u4e00-\\u9fff\\uff01-\\uff60]";
 const CJK_SPACE_CJK = new RegExp(`${CJK}[ \\t\\n\\u00a0]+${CJK}`);
 
+/** 自サイト（配信オリジン＋basePath の内側）の URL か。末尾スラッシュ無しの basePath も自サイト。 */
+function isSelf(u) {
+  return u.origin === SITE_ORIGIN && (u.pathname === BASE_PATH || u.pathname.startsWith(`${BASE_PATH}/`));
+}
+
+/** URL を持つ属性。srcset はカンマ区切りの候補ごとに見る。 */
+const URL_ATTRS = ["href", "src", "srcset", "poster", "data", "action", "formaction"];
+
+/**
+ * 遷移（ユーザーが辿るだけ）のリンクか。これ以外はページ表示時に何かを読み込む・送る参照として、
+ * 外部なら許可リストで判定する。
+ */
+function isNavigation(tag, attrs) {
+  if (tag === "a" || tag === "area") return true;
+  if (tag === "link") {
+    const rels = (attrs.rel ?? "").toLowerCase().split(/\s+/);
+    return rels.every((r) => ["canonical", "alternate", "author", "license", "help", "search", "next", "prev"].includes(r));
+  }
+  return false;
+}
+
 function checkLinks(rel, html) {
   const pageUrl = urlOfFile(rel);
   const refs = [];
   for (const m of html.matchAll(/<(\w+)\b([^>]*)>/g)) {
     const tag = m[1].toLowerCase();
+    if (tag === "html" || tag === "body") continue;
     const attrs = parseAttrs(m[2]);
-    const isScript =
-      tag === "script" || (tag === "link" && (attrs.as === "script" || attrs.rel === "modulepreload"));
-    for (const name of ["href", "src"]) {
-      if (attrs[name] !== undefined) refs.push({ tag, name, value: attrs[name], isScript });
+    const navigation = isNavigation(tag, attrs);
+    for (const name of URL_ATTRS) {
+      if (attrs[name] === undefined) continue;
+      const values =
+        name === "srcset"
+          ? attrs[name].split(",").map((c) => c.trim().split(/\s+/)[0]).filter(Boolean)
+          : [attrs[name]];
+      for (const value of values) refs.push({ tag, name, value, navigation });
     }
   }
-  for (const { tag, name, value, isScript } of refs) {
+  for (const { tag, name, value, navigation } of refs) {
     const label = `<${tag} ${name}="${value}">`;
-    if (value === "" ) {
+    if (value.trim() === "") {
       fail(`${rel}: 空のリンク ${label}`);
       continue;
     }
-    if (value.startsWith("#") || /^(mailto|tel|data):/i.test(value)) continue;
-    // 外部（// 始まり・http(s)）
-    if (value.startsWith("//") || /^https?:\/\//i.test(value)) {
-      const abs = new URL(value, SITE_URL);
-      if (abs.origin === SITE_ORIGIN && abs.toString().startsWith(SITE_URL)) {
-        if (!resolvesInOut(abs.toString())) fail(`${rel}: リンク先が out/ に無い ${label}`);
-        continue;
-      }
-      if (isScript && !SCRIPT_HOST_ALLOWLIST.has(abs.hostname)) {
-        fail(`${rel}: 許可していない外部 script ${label}`);
-      }
+    if (value.startsWith("#") || /^(mailto|tel):/i.test(value)) continue;
+    if (/^data:/i.test(value)) {
+      if (!navigation && tag === "script") fail(`${rel}: data: の script ${label}`);
       continue;
     }
-    if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value) && !/^https?:/i.test(value)) {
       fail(`${rel}: 想定外のスキーム ${label}`);
       continue;
     }
-    // ルート相対
-    if (value.startsWith("/")) {
-      if (value !== BASE_PATH && !value.startsWith(`${BASE_PATH}/`)) {
+    // ルート相対（/ 始まり・// 始まりでない）は basePath の内側でなければならない
+    if (value.startsWith("/") && !value.startsWith("//")) {
+      if (value !== BASE_PATH && !value.startsWith(`${BASE_PATH}/`) && !value.startsWith(`${BASE_PATH}?`) && !value.startsWith(`${BASE_PATH}#`)) {
         fail(`${rel}: basePath(${BASE_PATH}) の外へ出る内部リンク ${label}`);
         continue;
       }
-      if (!resolvesInOut(new URL(value, SITE_ORIGIN).toString())) {
-        fail(`${rel}: リンク先が out/ に無い ${label}`);
-      }
+    }
+    // 相対・ルート相対・// 始まり・絶対URL をすべて配信URLとして解決して判定する
+    const abs = new URL(value, pageUrl);
+    if (isSelf(abs)) {
+      if (!resolvesInOut(abs.toString())) fail(`${rel}: リンク先が out/ に無い ${label}（→ ${abs}）`);
       continue;
     }
-    // 相対
-    const abs = new URL(value, pageUrl).toString();
-    if (!abs.startsWith(SITE_URL) || !resolvesInOut(abs)) {
-      fail(`${rel}: 相対リンクが out/ の実ファイルに解決できない ${label}（→ ${abs}）`);
+    if (abs.origin === SITE_ORIGIN) {
+      fail(`${rel}: 同じオリジンだが basePath(${BASE_PATH}) の外 ${label}（→ ${abs}）`);
+      continue;
+    }
+    // 外部
+    if (!navigation && !LOAD_HOST_ALLOWLIST.has(abs.hostname)) {
+      fail(`${rel}: 許可していない外部の読み込み ${label}`);
     }
   }
 }

@@ -20,7 +20,12 @@ export function SiteHeader() {
   );
 }
 
-export function SiteFooter() {
+interface SiteFooterProps {
+  /** 表示中のページ。そのページへのリンクに aria-current="page" を付ける。 */
+  current?: "gauge" | "privacy";
+}
+
+export function SiteFooter({ current }: SiteFooterProps = {}) {
   return (
     <footer className="site-footer">
       <div className="container">
@@ -32,10 +37,20 @@ export function SiteFooter() {
         </p>
         <ul className="footer-links">
           <li>
-            <Link href={GAUGE_GUIDE_PATH}>ゲージから目数・段数を出す方法</Link>
+            <Link
+              href={GAUGE_GUIDE_PATH}
+              aria-current={current === "gauge" ? "page" : undefined}
+            >
+              ゲージから目数・段数を出す方法
+            </Link>
           </li>
           <li>
-            <Link href="/privacy/">プライバシーについて</Link>
+            <Link
+              href="/privacy/"
+              aria-current={current === "privacy" ? "page" : undefined}
+            >
+              プライバシーについて
+            </Link>
           </li>
         </ul>
         <p style={{ marginTop: "var(--sp-4)" }}>© ニットゲージ計算</p>

@@ -36,7 +36,9 @@ export function ScrollRegion({ titleId, title, hintId, children }: Props) {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
+    // 領域の幅だけでなく、中身（表）の幅が変わったとき（フォント読み込み等）も測り直す。
     ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => ro.disconnect();
   }, [measure]);
 

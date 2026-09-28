@@ -503,6 +503,10 @@
   font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
 }
+/* 演算子の前後の間隔（文字の空白ではなく余白で取る） */
+.formula__op {
+  margin-inline: 0.35em;
+}
 .formula + .formula {
   margin-top: var(--sp-2);
 }
@@ -631,6 +635,23 @@
 .chart-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius);
+}
+/* フォーカスリングは枠（.chart-frame）の外側に描く。スクロール領域自身に描くと、
+   枠の overflow:hidden で切れるうえ、内側に描いても固定列（sticky）の背景に隠れる。 */
+.chart-scroll:focus-visible {
+  outline: none;
+}
+.chart-frame:has(> .chart-scroll:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* :has 非対応のブラウザでは領域の内側に描く（固定列の上では一部隠れるが、上下右で見える） */
+@supports not selector(:has(*)) {
+  .chart-scroll:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -3px;
+  }
 }
 /* 行の高さを整数 px に揃える（小数になると固定列と他の列で行罫が 1px ずれて見える） */
 .quick-chart th,
@@ -644,6 +665,8 @@
   left: 0;
   z-index: 1;
   border-right: 1px solid var(--table-rule);
+  /* 下に潜った列の罫と二重線に見えないよう、固定列の右にわずかな影を落とす */
+  box-shadow: 3px 0 4px -2px color-mix(in srgb, var(--table-rule) 60%, transparent);
 }
 .quick-chart thead th:first-child {
   background: var(--surface-2);

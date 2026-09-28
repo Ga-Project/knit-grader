@@ -89,6 +89,24 @@ function CalcLine({ step, unit }: { step: CalcStep; unit: string }) {
   );
 }
 
+/**
+ * 一般式「目数 ＝ 幅（cm） ÷ 10 × 10cmあたりの目数」。演算子の前後の間隔は CSS の余白で取る
+ * （文字の空白にすると和文の間に空白が入る）。語の途中では折り返さない。
+ */
+function Formula({ result, length, per }: { result: string; length: string; per: string }) {
+  return (
+    <p className="formula">
+      <span className="nowrap">{result}</span>
+      <span className="formula__op">＝</span>
+      <span className="nowrap">{length}</span>
+      <span className="formula__op">÷</span>
+      <span className="nowrap">10</span>
+      <span className="formula__op">×</span>
+      <span className="nowrap">{per}</span>
+    </p>
+  );
+}
+
 export default function GaugeGuide() {
   const m = mismatch;
   return (
@@ -155,8 +173,8 @@ export default function GaugeGuide() {
             <span className="eyebrow">計算式</span>
             <h2 id="formula-heading">計算式と実例</h2>
             <div className="formula-box">
-              <p className="formula">{"目数＝幅（cm）÷10×10cmあたりの目数"}</p>
-              <p className="formula">{"段数＝丈（cm）÷10×10cmあたりの段数"}</p>
+              <Formula result="目数" length="幅（cm）" per="10cmあたりの目数" />
+              <Formula result="段数" length="丈（cm）" per="10cmあたりの段数" />
               <p className="formula-box__note">
                 {"割り切れないときは、最後に四捨五入して整数にします。"}
               </p>
@@ -308,7 +326,7 @@ export default function GaugeGuide() {
         </section>
       </main>
 
-      <SiteFooter />
+      <SiteFooter current="gauge" />
     </>
   );
 }
