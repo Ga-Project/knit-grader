@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { StitchMark } from "./StitchMark";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
+import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
 
 export function SiteHeader() {
   return (
@@ -22,7 +23,7 @@ export function SiteHeader() {
 
 interface SiteFooterProps {
   /** 表示中のページ。そのページへのリンクに aria-current="page" を付ける。 */
-  current?: "gauge" | "privacy";
+  current?: "gauge" | "swatch" | "privacy";
 }
 
 export function SiteFooter({ current }: SiteFooterProps = {}) {
@@ -42,6 +43,14 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
               aria-current={current === "gauge" ? "page" : undefined}
             >
               ゲージから目数・段数を出す方法
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={SWATCH_GUIDE_PATH}
+              aria-current={current === "swatch" ? "page" : undefined}
+            >
+              ゲージの測り方
             </Link>
           </li>
           <li>

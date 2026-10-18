@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
+import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
 import { HOME_TITLE, HOME_DESCRIPTION } from "./config";
 import { pageMetadata } from "./seo";
 import { GaugeTool } from "./GaugeTool";
@@ -173,6 +174,11 @@ export default function Home() {
             <p className="faq__more">
               <Link href={GAUGE_GUIDE_PATH}>
                 ゲージから目数・段数を出す方法（計算式と早見表）
+              </Link>
+            </p>
+            <p className="faq__more">
+              <Link href={SWATCH_GUIDE_PATH}>
+                ゲージの測り方（スワッチの編み方と数え方）
               </Link>
             </p>
           </div>

@@ -23,6 +23,7 @@ import {
   buildFaqPageJsonLd,
   serializeJsonLd,
 } from "@/lib/json-ld";
+import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
 import { QuickChart } from "./QuickChart";
 
 const PAGE_NAME = "ゲージから目数・段数を出す方法";
@@ -164,6 +165,9 @@ export default function GaugeGuide() {
               {
                 "同じ糸・同じ針でも編む人や編み方で目の大きさは変わるため、編み図の数字をそのまま使う前に、自分の試し編みを測ってゲージを確かめるのが確実です。"
               }
+            </p>
+            <p>
+              <Link href={SWATCH_GUIDE_PATH}>ゲージの測り方（スワッチの編み方と数え方）</Link>
             </p>
           </div>
         </section>

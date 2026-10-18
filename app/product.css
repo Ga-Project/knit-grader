@@ -701,3 +701,218 @@
   align-items: center;
   min-height: 44px;
 }
+
+/* ===== ゲージの測り方（/swatch/）: 番号付きの編み地断面図 ===== */
+
+/* 手順は「断面図の引出線」: 左の縦罫に番号の節が並び、図と説明が付く。狭い画面では図→説明の縦積み */
+.section-plan {
+  list-style: none;
+  margin: var(--sp-6) 0 0;
+  padding: 0;
+}
+.section-plan__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 11rem) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+  margin: 0;
+  padding-bottom: var(--sp-8);
+}
+.section-plan__item:last-child {
+  padding-bottom: 0;
+}
+/* 番号の節をつなぐ縦罫 */
+.section-plan__item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(1.25rem - 1px);
+  top: 2.5rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--table-rule);
+}
+.section-plan__no {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-family: var(--font-mono);
+  font-weight: var(--fw-black);
+}
+.section-plan__fig {
+  background-color: var(--surface);
+  border: 1px solid var(--table-rule);
+  border-radius: var(--radius);
+  padding: var(--sp-2);
+  background-image:
+    repeating-linear-gradient(0deg, var(--border) 0 1px, transparent 1px var(--cell)),
+    repeating-linear-gradient(90deg, var(--border) 0 1px, transparent 1px var(--cell));
+}
+.section-plan__text h3 {
+  margin-top: 0;
+}
+.section-plan__text p {
+  margin-top: var(--sp-2);
+  color: var(--text-soft);
+}
+@media (max-width: 560px) {
+  .section-plan__item {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+  .section-plan__fig,
+  .section-plan__text {
+    grid-column: 2;
+  }
+  .section-plan__text {
+    grid-row: 1;
+  }
+  .section-plan__fig {
+    grid-row: 2;
+    max-width: 14rem;
+  }
+}
+
+/* 断面図 SVG（色はトークン経由・文字は等幅） */
+.fig {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.fig-cloth {
+  fill: var(--accent-tint);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.fig-zone {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.fig-ghost {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.fig-hatch {
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.35;
+}
+.fig-arrow,
+.fig-ruler,
+.fig-v {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fig-text {
+  fill: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* 換算部品: 入力2つ＋結果。結果は空・入力不正でも高さが跳ねないよう最低高さを持つ */
+.swatch-calc {
+  margin-top: var(--sp-5);
+  display: grid;
+  gap: var(--sp-5);
+}
+.swatch-calc__row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.swatch-calc__title {
+  margin: 0;
+  font-size: var(--fs-base);
+}
+.swatch-calc__out {
+  min-height: 5.5rem;
+  border-left: 3px solid var(--accent);
+  padding-left: var(--sp-4);
+}
+.swatch-calc__out.is-empty {
+  border-left-color: var(--table-rule);
+}
+.swatch-calc__num {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-soft);
+  font-weight: var(--fw-semibold);
+}
+.swatch-calc__num b {
+  margin-inline: 0.3em 0.15em;
+  font-size: clamp(1.8rem, 6vw, 2.4rem);
+  font-weight: var(--fw-black);
+  color: var(--text);
+}
+.swatch-calc__label {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  letter-spacing: var(--tracking-wide);
+}
+.swatch-calc__calc {
+  margin: var(--sp-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+}
+.swatch-calc__note,
+.swatch-calc__hint {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.swatch-calc__next a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: var(--fw-semibold);
+}
+.swatch-calc .field-pair {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+
+/* 実例 */
+.swatch-ex__title {
+  margin-top: var(--sp-8);
+}
+.swatch-ex {
+  margin-top: var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--sp-4);
+}
+.swatch-ex__row > p {
+  margin: 0;
+}
+.swatch-ex__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-soft);
+}
+.swatch-ex__note {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
