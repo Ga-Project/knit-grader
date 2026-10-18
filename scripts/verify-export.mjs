@@ -16,6 +16,10 @@
 //   /gauge/
 //     - FAQPage / BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
 //     - 早見表・実例・仕上がり寸法・本文の計算式が計算関数と一致（手書き値や偽の等式を検出）
+//   /swatch/
+//     - FAQPage（3〜4件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
+//     - 実例の表示値（data-per10）が per10cmFromCount と一致、換算式の＝／≈が計算結果と一致
+//     - 換算部品の入力欄が空状態で描画され、/gauge/ ・トップへ相互リンクがある
 //   トップ
 //     - GoatCounter タグ・SoftwareApplication JSON-LD・/gauge/ への導線
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -25,6 +29,7 @@ import { SITE_URL, OG_IMAGE_URL, GOATCOUNTER_CODE } from "../app/config.ts";
 import { countForLength } from "../lib/grading.ts";
 import { findEquationErrors, finishedCm } from "../lib/calc-text.ts";
 import { GAUGE_GUIDE_PATH } from "../lib/gauge-guide.ts";
+import { per10cmResult, per10cmText, findPer10Errors, SWATCH_GUIDE_PATH } from "../lib/swatch-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -32,6 +37,7 @@ const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 const BASE_PATH = new URL(SITE_URL).pathname.replace(/\/$/, "");
 const SITE_ORIGIN = new URL(SITE_URL).origin;
 const GAUGE_URL = new URL(GAUGE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
+const SWATCH_URL = new URL(SWATCH_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 
 /**
  * 外部から読み込んでよいホスト（script・stylesheet・preload・iframe・img 等の読み込み系すべて）。
@@ -383,6 +389,7 @@ function checkGaugePage(rel, html) {
   if (eq.found < 2) fail(`${rel}: 本文の計算式が ${eq.found} 件しか見つからない`);
   for (const e of eq.errors) fail(`${rel}: 計算式の食い違い ${e}`);
 
+  if (!html.includes(`href="${BASE_PATH}${SWATCH_GUIDE_PATH}"`)) fail(`${rel}: /swatch/ への導線が無い`);
   checkQuickChart(rel, html);
   checkMarkers(rel, html);
   checkFinishedClaims(rel, html);
@@ -470,6 +477,59 @@ function checkMarkers(rel, html) {
   }
 }
 
+/** /swatch/: JSON-LD・FAQ・実例の表示値・換算式・換算部品の空状態・相互リンク。 */
+function checkSwatchPage(rel, html) {
+  const blocks = jsonLdBlocks(rel, html);
+  const faq = blocks.find((b) => b["@type"] === "FAQPage");
+  const crumbs = blocks.find((b) => b["@type"] === "BreadcrumbList");
+  if (!faq) fail(`${rel}: FAQPage JSON-LD が無い`);
+  if (!crumbs) fail(`${rel}: BreadcrumbList JSON-LD が無い`);
+  const text = visibleText(html);
+  if (faq) {
+    const items = faq.mainEntity ?? [];
+    const detailsCount = (html.match(/<details\s+class="faq__item"/g) ?? []).length;
+    if (items.length < 3 || items.length > 4) fail(`${rel}: FAQ が ${items.length} 件（3〜4件）`);
+    if (items.length !== detailsCount) {
+      fail(`${rel}: FAQPage ${items.length} 件と本文の FAQ ${detailsCount} 件が一致しない`);
+    }
+    for (const q of items) {
+      if (!text.includes(q.name)) fail(`${rel}: FAQPage の質問が本文に無い: ${q.name}`);
+      const a = q.acceptedAnswer?.text ?? "";
+      if (!a || !text.includes(a)) fail(`${rel}: FAQPage の回答が本文に無い: ${a.slice(0, 40)}…`);
+    }
+  }
+  if (crumbs) {
+    const list = crumbs.itemListElement ?? [];
+    const last = list[list.length - 1];
+    if (!last || last.item !== SWATCH_URL) fail(`${rel}: パンくずの末尾が ${SWATCH_URL} でない`);
+    if (!list[0] || list[0].item !== SITE_URL) fail(`${rel}: パンくずの先頭が ${SITE_URL} でない`);
+  }
+  const eq = findPer10Errors(text);
+  if (eq.found < 2) fail(`${rel}: 本文の換算式が ${eq.found} 件しか見つからない`);
+  for (const e of eq.errors) fail(`${rel}: 換算式の食い違い ${e}`);
+
+  const marks = [...html.matchAll(/<(\w+)\b[^>]*\sdata-per10="([\d.]+),([\d.]+)"[^>]*>(.*?)<\/\1>/gs)];
+  if (marks.length < 2) fail(`${rel}: 実例の換算結果（data-per10）が ${marks.length} 件`);
+  for (const m of marks) {
+    const r = per10cmResult(Number(m[2]), Number(m[3]));
+    const expected = r ? per10cmText(r) : "";
+    const shown = textOf(m[4]);
+    if (shown !== expected) fail(`${rel}: ${m[2]}÷${m[3]}×10 の表示が「${shown}」（期待 ${expected}）`);
+  }
+  // 換算部品: 空状態で出力欄が描画され、入力欄にラベルが付いている
+  for (const id of ["sw-st", "sw-row"]) {
+    if (!new RegExp(`<input[^>]*id="${id}-count"`).test(html)) fail(`${rel}: 入力欄 ${id}-count が無い`);
+    if (!new RegExp(`<label[^>]*for="${id}-length"`).test(html)) fail(`${rel}: ${id}-length のラベルが無い`);
+    if (!new RegExp(`class="[^"]*\\bis-empty\\b[^"]*"[^>]*data-testid="${id}-result"`).test(html)) {
+      fail(`${rel}: 換算部品 ${id} の空状態が描画されていない`);
+    }
+  }
+  if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
+  if (!html.includes(`href="${BASE_PATH}/"`)) fail(`${rel}: トップへの導線が無い`);
+  // 無料のまま: 有料・課金・書き出しの語を出さない
+  if (/有料|課金|書き出し|エクスポート|サブスク/.test(text)) fail(`${rel}: 有料機能を示す語が本文にある`);
+}
+
 function checkTopPage(rel, html) {
   if (!html.includes(`https://${GOATCOUNTER_CODE}.goatcounter.com/count`)) {
     fail(`${rel}: GoatCounter のカウント先（${GOATCOUNTER_CODE}）が無い`);
@@ -480,6 +540,9 @@ function checkTopPage(rel, html) {
   }
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) {
     fail(`${rel}: /gauge/ への導線（href="${BASE_PATH}${GAUGE_GUIDE_PATH}"）が無い`);
+  }
+  if (!html.includes(`href="${BASE_PATH}${SWATCH_GUIDE_PATH}"`)) {
+    fail(`${rel}: /swatch/ への導線（href="${BASE_PATH}${SWATCH_GUIDE_PATH}"）が無い`);
   }
 }
 
@@ -497,6 +560,8 @@ function main() {
   const locs = readSitemapLocs();
   if (!locs.includes(GAUGE_URL)) fail(`sitemap.xml: ${GAUGE_URL} が無い`);
   if (!locs.includes(SITE_URL)) fail(`sitemap.xml: ${SITE_URL} が無い`);
+  if (!locs.includes(SWATCH_URL)) fail(`sitemap.xml: ${SWATCH_URL} が無い`);
+  if (new Set(locs).size !== locs.length) fail("sitemap.xml: URL が重複している");
 
   for (const rel of files) checkCommon(rel, readFileSync(join(OUT_DIR, rel), "utf8"));
 
@@ -521,6 +586,9 @@ function main() {
   const gauge = byUrl.get(GAUGE_URL);
   if (gauge) checkGaugePage(gauge, readFileSync(join(OUT_DIR, gauge), "utf8"));
   else fail(`${GAUGE_URL} のページが out/ に無い`);
+  const swatch = byUrl.get(SWATCH_URL);
+  if (swatch) checkSwatchPage(swatch, readFileSync(join(OUT_DIR, swatch), "utf8"));
+  else fail(`${SWATCH_URL} のページが out/ に無い`);
   const top = byUrl.get(SITE_URL);
   if (top) checkTopPage(top, readFileSync(join(OUT_DIR, top), "utf8"));
   else fail("トップの index.html が無い");
