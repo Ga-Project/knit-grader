@@ -63,3 +63,20 @@ export function computeCounts(
     rows: countForLength(gauge.rows, lengthCm),
   };
 }
+
+/**
+ * 試し編みで数えた目数(または段数)と、その測った長さ(cm)から、10cm あたりの値を求める。
+ * countForLength / lengthForCount の逆向きの換算。parseMeasure と同じ規則で、
+ * 数えた数・長さのどちらかが 1 以上の有限数でなければ null を返す。
+ * 割り算の誤差を減らすため (count × 10) ÷ length の順で計算する。丸めはしない（表示は calc-text.ts）。
+ */
+export function per10cmFromCount(count: number, lengthCm: number): number | null {
+  if (!Number.isFinite(count) || !Number.isFinite(lengthCm)) return null;
+  if (count < 1 || lengthCm < 1) return null;
+  return (count * 10) / lengthCm;
+}
+
+/** 10cm あたりの値を整数のゲージとして使うときの丸め（四捨五入）。 */
+export function toIntegerGauge(per10cm: number): number {
+  return Math.round(per10cm);
+}
