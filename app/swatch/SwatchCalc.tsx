@@ -107,7 +107,7 @@ function ConvertRow({
           </>
         ) : (
           <p className="swatch-calc__hint">
-            数えた{unit}と測った長さを入れると、10cmあたりに換算します。
+            {countLabel}と測った長さを入れると、10cmあたりに換算します。
           </p>
         )}
       </div>
