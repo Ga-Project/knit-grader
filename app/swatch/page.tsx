@@ -46,17 +46,17 @@ const steps = [
   {
     kind: "knit",
     title: "測りたい10cmより大きめに編む",
-    body: "試し編み（スワッチ）は、測りたい10cmよりひと回り大きく編みます。端の目は形が崩れやすいので、端を避けた中央で10cm分を測れる余裕を持たせます。糸・針・模様は本番と同じにします。",
+    body: "試し編み（スワッチ）は、測りたい10cmよりひと回り大きめに編むのが一般的です。端の目は形が崩れやすいとされるため、端を避けた中央で10cm分を測れる余裕を持たせます。糸・針・模様は本番と同じにします。",
   },
   {
     kind: "wash",
     title: "本番と同じ洗い方・仕上げ方で乾かす",
-    body: "作品を洗って仕上げる予定なら、スワッチも同じ洗い方・仕上げ方にしてから乾かします。洗うと編み地の大きさが変わることがあるため、仕上げたあとの状態で測ります。",
+    body: "作品を洗って仕上げる予定なら、スワッチも同じ洗い方・仕上げ方にしてから乾かすのが一般的です。洗うと編み地が縮むことも伸びることもあるため、仕上げたあとの状態で測るとよいとされています。",
   },
   {
     kind: "count",
     title: "平らに置き、中央で数える",
-    body: "編み地を無理に引っ張らず平らに置き、端を避けた中央で長さを測ります。その範囲の目数（横）と段数（縦）を、目数と段数それぞれ別に数えます。",
+    body: "編み地を無理に引っ張らず平らに置き、端を避けた中央で長さを測るとよいとされています。その範囲の目数（横）と段数（縦）は、別々に数えます。",
   },
   {
     kind: "convert",
@@ -103,7 +103,8 @@ export default function SwatchGuide() {
 
       <main id="main" tabIndex={-1} style={{ outline: "none" }}>
         <section className="hero-band">
-          <div className="container container-narrow">
+          <div className="container swatch-hero">
+            <div className="swatch-hero__text">
             <nav className="breadcrumb" aria-label="パンくずリスト">
               <ol>
                 <li>
@@ -115,8 +116,10 @@ export default function SwatchGuide() {
             <span className="eyebrow">ゲージの使い方</span>
             <h1>{PAGE_NAME}</h1>
             <p className="hero-lead">
+              {"ゲージは、"}
+              <span className="nowrap">試し編み（スワッチ）</span>
               {
-                "ゲージは、試し編み（スワッチ）の10cm四方に入る目数と段数です。編んで、洗って乾かして、中央で数え、10cmあたりに換算する。この4つの手順で測れます。"
+                "の10cm四方に入る目数と段数です。編んで、洗って乾かして、中央で数え、10cmあたりに換算する。この4つの手順で測れます。"
               }
             </p>
             <div className="hero-actions">
@@ -124,13 +127,20 @@ export default function SwatchGuide() {
                 10cmあたりに換算する
               </a>
             </div>
+            </div>
+            <div className="swatch-hero__fig">
+              <SwatchFigure kind="hero" />
+            </div>
           </div>
         </section>
 
         <section className="guide-section" aria-labelledby="steps-heading">
           <div className="container container-narrow">
             <span className="eyebrow">手順</span>
-            <h2 id="steps-heading">スワッチを測る4つの手順</h2>
+            <h2 id="steps-heading">
+              <span className="nowrap">スワッチを測る</span>
+              <span className="nowrap">4つの手順</span>
+            </h2>
             <ol className="section-plan">
               {steps.map((s, i) => (
                 <li className="section-plan__item" key={s.kind}>
@@ -153,7 +163,10 @@ export default function SwatchGuide() {
         <section className="guide-section" id="calc" aria-labelledby="calc-heading">
           <div className="container container-narrow">
             <span className="eyebrow">換算</span>
-            <h2 id="calc-heading">数えた数から10cmあたりを出す</h2>
+            <h2 id="calc-heading">
+              <span className="nowrap">数えた数から</span>
+              <span className="nowrap">10cmあたりを出す</span>
+            </h2>
             <p>
               {
                 "数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、割り切れないときは「約」を付けます。"
@@ -168,7 +181,7 @@ export default function SwatchGuide() {
             </div>
             <p>
               {
-                "出した10cmあたりの値は、そのまま計算ツールのゲージに入力できます。計算ツールは小数のゲージも扱えます。"
+                "出した10cmあたりの値は、小数のままでも、整数に丸めた値でも、計算ツールのゲージに入力できます。"
               }
             </p>
             <p className="faq__more">

@@ -713,7 +713,7 @@
 .section-plan__item {
   position: relative;
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 11rem) minmax(0, 1fr);
+  grid-template-columns: 2.5rem minmax(0, 13rem) minmax(0, 1fr);
   gap: var(--sp-4);
   align-items: start;
   margin: 0;
@@ -745,6 +745,7 @@
   font-weight: var(--fw-black);
 }
 .section-plan__fig {
+  align-self: start;
   background-color: var(--surface);
   border: 1px solid var(--table-rule);
   border-radius: var(--radius);
@@ -777,7 +778,7 @@
   }
 }
 
-/* 断面図 SVG（色はトークン経由・文字は等幅） */
+/* 編み地の図 SVG（色はトークン経由）。文字は viewBox 幅 ≒ 表示幅のとき 12px で、11px 未満にならない */
 .fig {
   display: block;
   width: 100%;
@@ -788,7 +789,7 @@
   stroke: var(--accent);
   stroke-width: 1.5;
 }
-.fig-zone {
+.fig-frame {
   fill: var(--surface);
   stroke: var(--accent);
   stroke-width: 1.5;
@@ -796,29 +797,65 @@
 }
 .fig-ghost {
   fill: none;
-  stroke: var(--text-dim);
+  stroke: var(--text-soft);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
-.fig-hatch {
+.fig-ghost-line,
+.fig-solid-line {
+  fill: none;
+  stroke-width: 2;
+}
+.fig-ghost-line {
+  stroke: var(--text-soft);
+  stroke-dasharray: 4 3;
+}
+.fig-solid-line {
   stroke: var(--accent);
-  stroke-width: 1;
-  opacity: 0.35;
 }
 .fig-arrow,
-.fig-ruler,
+.fig-dim,
 .fig-v {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.6;
+  stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.fig-v--faint {
+  opacity: 0.45;
+}
 .fig-text {
   fill: var(--text);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 700;
+}
+
+/* hero: 左に見出し、右に完成した 10cm 角のスワッチ図。狭い画面では縦積み */
+.swatch-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  gap: var(--sp-8);
+  align-items: center;
+}
+.swatch-hero__fig {
+  max-width: 20rem;
+}
+@media (max-width: 760px) {
+  .swatch-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+  }
+  .swatch-hero__fig {
+    max-width: 15rem;
+  }
+}
+
+/* 見出しは語の途中で折り返さない（対応ブラウザでは文節で、他は nowrap の区切りで折る） */
+.section-plan__text h3,
+.guide-section h2 {
+  word-break: auto-phrase;
 }
 
 /* 換算部品: 入力2つ＋結果。結果は空・入力不正でも高さが跳ねないよう最低高さを持つ */
@@ -915,4 +952,18 @@
   margin-top: var(--sp-1);
   font-size: var(--fs-sm);
   color: var(--text-dim);
+}
+
+/* 図内の文字は編み目の上に重なっても読めるよう、地色の縁取りを付ける */
+.fig-text {
+  paint-order: stroke;
+  stroke: var(--accent-tint);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.fig--hero .fig-text,
+.fig--convert .fig-text,
+.fig--count .fig-text,
+.fig--wash .fig-text {
+  stroke: var(--surface);
 }
