@@ -3,7 +3,7 @@
 // 本文の実例・FAQ の数字は grading.ts の換算関数から導出し、手書きの数値を置かない。
 // 「＝」「≈」「約」「ちょうど」の言い切りも入力値からではなく計算結果から決める。
 // 表示は小数第1位まで（calc-text.ts の formatDecimal と同じ丸め）。整数のゲージとして使うときは四捨五入。
-import { per10cmFromCount, toIntegerGauge } from "./grading.ts";
+import { parseMeasure, per10cmFromCount, toIntegerGauge } from "./grading.ts";
 import { formatDecimal, isApprox } from "./calc-text.ts";
 import type { FaqItem } from "./json-ld.ts";
 
@@ -98,10 +98,22 @@ export function buildSwatchExample(): SwatchExample {
 // FAQ（本文と FAQPage 構造化データの共通の源）
 // ---------------------------------------------------------------------------
 
+/** 「10cmちょうど測れないとき」の回答。割り切れるかどうかの言い切りと整数の値は換算結果から決める。 */
+export function convertFaqAnswer(count: number, lengthCm: number): string {
+  const r = per10cmResult(count, lengthCm);
+  if (r === null) throw new Error("convertFaqAnswer: invalid input");
+  const p = per10cmParts(r);
+  return (
+    "数えた目数を測った幅で割り、10を掛けて10cmあたりに換算します。" +
+    `たとえば${r.lengthCm}cmで${r.count}目なら、${p.expression}${p.relation}${p.value}目です。` +
+    (r.integerDiffers
+      ? `割り切れないので、小数のまま計算ツールに入力するか、整数で使うなら四捨五入して${r.integer}目にします。`
+      : "割り切れるので、そのまま使えます。")
+  );
+}
+
 export function buildSwatchFaqs(): FaqItem[] {
   const ex = buildSwatchExample();
-  const s = ex.stitches;
-  const p = per10cmParts(s);
   return [
     {
       q: "試し編みは何cm四方に編めばよいですか？",
@@ -117,12 +129,7 @@ export function buildSwatchFaqs(): FaqItem[] {
     },
     {
       q: "10cmちょうど測れないときは、どう計算しますか？",
-      a:
-        "数えた目数を測った幅で割り、10を掛けて10cmあたりに換算します。" +
-        `たとえば${s.lengthCm}cmで${s.count}目なら、${p.expression}${p.relation}${p.value}目です。` +
-        (s.integerDiffers
-          ? `小数のまま計算ツールに入力するか、整数で使うなら四捨五入して${s.integer}目にします。`
-          : "割り切れるので、そのまま使えます。"),
+      a: convertFaqAnswer(ex.stitches.count, ex.stitches.lengthCm),
     },
     {
       q: "段数も同じ方法で測れますか？",
@@ -131,6 +138,31 @@ export function buildSwatchFaqs(): FaqItem[] {
         "目数と段数は別々に測り、それぞれ中央で数えてください。",
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// 入力欄の状態（UI の分岐を純関数に出して単体テストする）
+// ---------------------------------------------------------------------------
+
+export type SwatchRowState =
+  | { kind: "empty" }
+  | { kind: "invalid"; countBad: boolean; lengthBad: boolean }
+  | { kind: "outOfRange" }
+  | { kind: "ok"; result: Per10cmResult };
+
+/**
+ * 数えた数・測った長さの2つの入力文字列から、表示すべき状態を決める。
+ * invalid: どちらかが入力済みで解釈できない／outOfRange: 両方有効だが換算結果がゲージの範囲外。
+ */
+export function swatchRowState(countText: string, lengthText: string): SwatchRowState {
+  const c = parseMeasure(countText);
+  const l = parseMeasure(lengthText);
+  const countBad = countText.trim() !== "" && c === null;
+  const lengthBad = lengthText.trim() !== "" && l === null;
+  if (countBad || lengthBad) return { kind: "invalid", countBad, lengthBad };
+  if (c === null || l === null) return { kind: "empty" };
+  const result = per10cmResult(c, l);
+  return result === null ? { kind: "outOfRange" } : { kind: "ok", result };
 }
 
 // ---------------------------------------------------------------------------
@@ -174,4 +206,47 @@ export function findPer10Errors(text: string): { found: number; errors: string[]
     }
   }
   return { found, errors };
+}
+
+/**
+ * 「整数にしたときの案内」（「四捨五入して N」「そのまま使えます（N）」「割り切れる／割り切れない」）が、
+ * 数えた数 count と長さ lengthCm の換算結果と合っているか。換算結果は per10cmFromCount と Math.round から
+ * 独立に求める（integerNote / per10cmResult の実装が壊れても検出できるように）。
+ */
+export function findIntegerClaimErrors(claim: string, count: number, lengthCm: number): string[] {
+  const raw = per10cmFromCount(count, lengthCm);
+  if (raw === null) return [`${count}÷${lengthCm}: 換算できない入力`];
+  const rounded = Math.round(raw);
+  const divisible = Math.abs(raw - rounded) <= EPSILON;
+  const errors: string[] = [];
+  const text = claim.replace(/\s+/g, "");
+  let claims = 0;
+  const round = text.match(/四捨五入して(\d+)/);
+  if (round) {
+    claims += 1;
+    if (divisible) errors.push(`「四捨五入して」と書いているが ${raw} は整数`);
+    if (Number(round[1]) !== rounded) errors.push(`四捨五入した値は ${rounded}（本文は ${round[1]}）`);
+  }
+  const asIs = text.match(/そのまま使えます（(\d+)[目段]）/);
+  if (asIs) {
+    claims += 1;
+    if (!divisible) errors.push(`「そのまま使えます」と書いているが ${raw} は整数でない`);
+    if (Number(asIs[1]) !== rounded) errors.push(`整数の値は ${rounded}（本文は ${asIs[1]}）`);
+  }
+  if (/割り切れない/.test(text)) {
+    claims += 1;
+    if (divisible) errors.push(`「割り切れない」と書いているが ${raw} は整数`);
+  } else if (/割り切れる/.test(text)) {
+    claims += 1;
+    if (!divisible) errors.push(`「割り切れる」と書いているが ${raw} は整数でない`);
+  }
+  if (claims === 0) errors.push("整数についての言及が見つからない");
+  return errors;
+}
+
+/** FAQ の回答から「◯cmで◯目なら」を読み取り、整数・割り切れの言い切りを検査する。 */
+export function findFaqIntegerErrors(answer: string): string[] {
+  const m = answer.match(/(\d+(?:\.\d+)?)cmで(\d+(?:\.\d+)?)[目段]なら/);
+  if (!m || m[1] === undefined || m[2] === undefined) return ["「◯cmで◯目なら」が見つからない"];
+  return findIntegerClaimErrors(answer, Number(m[2]), Number(m[1]));
 }

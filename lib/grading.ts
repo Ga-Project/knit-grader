@@ -23,21 +23,34 @@ export const MIN_MEASURE = 1;
 export const MAX_MEASURE = 1000;
 
 /** 入力欄のエラー文言（UI はこの定数を使い、文言と受理範囲を一致させる）。 */
-export const MEASURE_ERROR = `${MIN_MEASURE}以上${MAX_MEASURE}以下の数値を入力してください`;
+export const MEASURE_ERROR = `半角の数字で、${MIN_MEASURE}以上${MAX_MEASURE}以下で入力してください`;
 
-/** 受理する書式: 半角数字と小数点のみ（符号・指数・16進・全角・桁区切りは不可）。「20.」のような入力途中も許す。 */
+/** 受理する書式（正規化後）: 半角数字と小数点のみ（符号・指数・16進・桁区切りは不可）。「20.」のような入力途中も許す。 */
 const MEASURE_PATTERN = /^\d+(?:\.\d*)?$/;
+
+/** 小数点がカンマの書き方（「1,5」）。桁区切り（「1,250」）と区別できないので、カンマ以降が3桁のときは小数とみなさない。 */
+const COMMA_DECIMAL = /^(\d+),(\d{1,2}|\d{4,})$/;
+
+/**
+ * 入力文字列を解釈しやすい形へそろえる（前後の空白除去・全角の数字と小数点を半角へ(NFKC)・カンマ小数を小数点へ）。
+ * 値の意味は変えない。解釈できるかどうかは parseMeasure が決める。
+ */
+export function normalizeMeasureText(input: string): string {
+  const text = input.normalize("NFKC").trim();
+  const m = text.match(COMMA_DECIMAL);
+  return m ? `${m[1]}.${m[2]}` : text;
+}
 
 /**
  * 入力文字列をゲージ／寸法の値として解釈する。
  * この道具のゲージ(目数・段数)も寸法(cm)も MIN_MEASURE(1) 未満は意味を成さず、
  * MAX_MEASURE(1000) 超は計算結果が桁あふれするため、空・非数・範囲外は無効として null を返す
- * （UI のエラー文言 MEASURE_ERROR と一致させる）。
+ * （UI のエラー文言 MEASURE_ERROR と一致させる）。全角数字・カンマ小数は先に半角へそろえる。
  */
 export function parseMeasure(input: string): number | null {
-  const trimmed = input.trim();
-  if (!MEASURE_PATTERN.test(trimmed)) return null;
-  const value = Number(trimmed);
+  const text = normalizeMeasureText(input);
+  if (!MEASURE_PATTERN.test(text)) return null;
+  const value = Number(text);
   if (!Number.isFinite(value) || value < MIN_MEASURE || value > MAX_MEASURE) return null;
   return value;
 }

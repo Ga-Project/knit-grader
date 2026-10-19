@@ -1,12 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  parseMeasure,
-  computeCounts,
-  countsUsable,
-  MEASURE_ERROR,
-} from "@/lib/grading";
+import { MEASURE_ERROR, normalizeMeasureText, parseMeasure } from "@/lib/grading";
+import { analyzeGaugeInputs } from "@/lib/gauge-input";
 import { STORAGE_KEY } from "./config";
 import { StitchMark } from "./StitchMark";
 
@@ -39,10 +35,16 @@ export function GaugeTool() {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const data = JSON.parse(raw) as Partial<Saved>;
-        setGaugeSt(data.gaugeSt ?? "");
-        setGaugeRow(data.gaugeRow ?? "");
-        setWidth(data.width ?? "");
-        setLength(data.length ?? "");
+        // 全角数字・カンマ小数など、いまの規則で解釈できる旧保存値は半角に正規化して復元する
+        // （復元バナーとエラーが同時に出ないようにする）。解釈できない値はそのまま見せてエラーにする。
+        const restoreText = (v: string | undefined): string => {
+          const text = v ?? "";
+          return parseMeasure(text) !== null ? normalizeMeasureText(text) : text;
+        };
+        setGaugeSt(restoreText(data.gaugeSt));
+        setGaugeRow(restoreText(data.gaugeRow));
+        setWidth(restoreText(data.width));
+        setLength(restoreText(data.length));
         const hasValue = Boolean(
           data.gaugeSt || data.gaugeRow || data.width || data.length,
         );
@@ -75,38 +77,25 @@ export function GaugeTool() {
     };
   }, [gaugeSt, gaugeRow, width, length]);
 
-  const gSt = parseMeasure(gaugeSt);
-  const gRow = parseMeasure(gaugeRow);
-  const w = parseMeasure(width);
-  const l = parseMeasure(length);
-  // gauge はオブジェクトなので毎レンダーで新規生成すると下流の useMemo が無効化される。
-  // 数値プリミティブ(gSt/gRow)を依存に固定して安定参照にする。
-  const gauge = useMemo(
-    () =>
-      gSt !== null && gRow !== null ? { stitches: gSt, rows: gRow } : null,
-    [gSt, gRow],
+  const state = useMemo(
+    () => analyzeGaugeInputs({ gaugeSt, gaugeRow, width, length }),
+    [gaugeSt, gaugeRow, width, length],
   );
-
-  const computed = useMemo(
-    () =>
-      gauge && w !== null && l !== null ? computeCounts(gauge, w, l) : null,
-    [gauge, w, l],
-  );
-  // 四捨五入で 0 目・0 段になる組み合わせは結果として出さず、案内を出す。
-  const tooSmall = computed !== null && !countsUsable(computed);
-  const custom = computed !== null && !tooSmall ? computed : null;
+  const { w, l, tooSmall } = state;
+  const custom = state.counts;
 
   // 編み地矩形の表示px（幅:丈 の物理比を保って収める）。
   // ゲージも揃って初めて描く（結果数値・タグと足並みを揃え、寸法だけの宙ぶらりんな矩形を出さない）。
   const swatch = useMemo(() => {
-    if (gauge === null || w === null || l === null || custom === null) return null;
+    if (w === null || l === null || custom === null) return null;
     const max = 200;
     const scale = max / Math.max(w, l);
     return { w: Math.max(24, w * scale), h: Math.max(24, l * scale) };
-  }, [gauge, w, l, custom]);
+  }, [w, l, custom]);
 
-  const fieldError = (raw: string, value: number | null) =>
-    raw.trim() !== "" && value === null;
+  // 目数・段数が 1 未満になる案内は、ゲージ欄・寸法欄のどの入力にも関係するので全欄から参照する。
+  const describedBy = (own: string | null) =>
+    [own, tooSmall ? "small-error" : null].filter(Boolean).join(" ") || undefined;
 
   const clearAll = useCallback(() => {
     // 消去は storage を消すだけにし、直後の空状態を保存し直さない。
@@ -159,16 +148,17 @@ export function GaugeTool() {
                       id="g-st"
                       type="text"
                       inputMode="decimal"
+                      autoComplete="off"
                       placeholder="20"
                       value={gaugeSt}
                       onChange={(e) => {
                         interacted.current = true;
                         setGaugeSt(e.target.value);
                       }}
-                      aria-invalid={fieldError(gaugeSt, gSt)}
-                      aria-describedby={
-                        fieldError(gaugeSt, gSt) ? "gauge-error" : undefined
-                      }
+                      aria-invalid={state.gaugeStBad}
+                      aria-describedby={describedBy(
+                        state.gaugeStBad ? "gauge-error" : null,
+                      )}
                     />
                     <span className="suffix">目</span>
                   </div>
@@ -180,22 +170,23 @@ export function GaugeTool() {
                       id="g-row"
                       type="text"
                       inputMode="decimal"
+                      autoComplete="off"
                       placeholder="28"
                       value={gaugeRow}
                       onChange={(e) => {
                         interacted.current = true;
                         setGaugeRow(e.target.value);
                       }}
-                      aria-invalid={fieldError(gaugeRow, gRow)}
-                      aria-describedby={
-                        fieldError(gaugeRow, gRow) ? "gauge-error" : undefined
-                      }
+                      aria-invalid={state.gaugeRowBad}
+                      aria-describedby={describedBy(
+                        state.gaugeRowBad ? "gauge-error" : null,
+                      )}
                     />
                     <span className="suffix">段</span>
                   </div>
                 </div>
               </div>
-              {(fieldError(gaugeSt, gSt) || fieldError(gaugeRow, gRow)) && (
+              {state.gaugeBad && (
                 <p className="field-error" id="gauge-error">
                   <span aria-hidden="true">⚠ </span>
                   {MEASURE_ERROR}
@@ -216,16 +207,17 @@ export function GaugeTool() {
                       id="w"
                       type="text"
                       inputMode="decimal"
+                      autoComplete="off"
                       placeholder="48"
                       value={width}
                       onChange={(e) => {
                         interacted.current = true;
                         setWidth(e.target.value);
                       }}
-                      aria-invalid={fieldError(width, w)}
-                      aria-describedby={
-                        fieldError(width, w) ? "dims-error" : "dims-hint"
-                      }
+                      aria-invalid={state.widthBad}
+                      aria-describedby={describedBy(
+                        state.widthBad ? "dims-error" : "dims-hint",
+                      )}
                     />
                     <span className="suffix">cm</span>
                   </div>
@@ -237,22 +229,23 @@ export function GaugeTool() {
                       id="l"
                       type="text"
                       inputMode="decimal"
+                      autoComplete="off"
                       placeholder="56"
                       value={length}
                       onChange={(e) => {
                         interacted.current = true;
                         setLength(e.target.value);
                       }}
-                      aria-invalid={fieldError(length, l)}
-                      aria-describedby={
-                        fieldError(length, l) ? "dims-error" : "dims-hint"
-                      }
+                      aria-invalid={state.lengthBad}
+                      aria-describedby={describedBy(
+                        state.lengthBad ? "dims-error" : "dims-hint",
+                      )}
                     />
                     <span className="suffix">cm</span>
                   </div>
                 </div>
               </div>
-              {(fieldError(width, w) || fieldError(length, l)) && (
+              {state.dimsBad && (
                 <p className="field-error" id="dims-error">
                   <span aria-hidden="true">⚠ </span>
                   {MEASURE_ERROR}
@@ -344,7 +337,7 @@ export function GaugeTool() {
             </div>
             {custom && w !== null && l !== null && (
               <p className="swatch-caption">
-                仕上がり <b>{width}cm</b> × <b>{length}cm</b>{" "}
+                仕上がり <b>{w}cm</b> × <b>{l}cm</b>{" "}
                 を、このゲージで編むと
                 <b> {custom.stitches}目</b> ×<b> {custom.rows}段</b>
               </p>
