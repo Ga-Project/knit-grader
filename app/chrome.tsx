@@ -1,6 +1,7 @@
 // 全ページ共通のヘッダー／フッター（静的・サーバーコンポーネント）。
 // 内部リンクは next/link を使う（basePath 配信時にサブパスを自動付与するため。
 // 素の <a href="/…"> は basePath が付かず、プロジェクトページで 404 になる）。
+import { Words } from "./Words";
 import Link from "next/link";
 import { StitchMark } from "./StitchMark";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
@@ -31,7 +32,7 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
     <footer className="site-footer">
       <div className="container">
         <p>
-          {"目数・段数は入力したゲージから算出した目安です。実際の製作では試し編みで再確認してください。"}
+          <Words text="目数・段数は入力したゲージから算出した目安です。実際の製作では試し編みで再確認してください。" />
         </p>
         <p style={{ marginTop: "var(--sp-2)" }}>
           {"入力した内容はお使いのブラウザ内にのみ保存され、サーバーへ送信されません。"}
@@ -62,7 +63,9 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
             </Link>
           </li>
         </ul>
-        <p style={{ marginTop: "var(--sp-4)" }}>© ニットゲージ計算</p>
+        <p style={{ marginTop: "var(--sp-4)" }}>
+          <Words text="© ニットゲージ計算" />
+        </p>
       </div>
     </footer>
   );

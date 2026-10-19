@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader, SiteFooter } from "../chrome";
+import { Words } from "../Words";
 import { FaqList } from "../Faq";
 import { Phrased } from "../Phrased";
 import { SITE_URL } from "../config";
@@ -156,7 +157,9 @@ export default function SwatchGuide() {
                     <h3>
                       <Phrased text={s.title} />
                     </h3>
-                    <p>{s.body}</p>
+                    <p>
+                      <Words text={s.body} />
+                    </p>
                   </div>
                 </li>
               ))}
@@ -172,7 +175,7 @@ export default function SwatchGuide() {
               <span className="nowrap">10cmあたりを出す</span>
             </h2>
             <p>
-              {"数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、小数第1位で表しきれないときは「約」を付けます。整数のゲージとして使うときは四捨五入した値も示します。"}
+              <Words text="数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、小数第1位で表しきれないときは「約」を付けます。整数のゲージとして使うときは四捨五入した値も示します。" />
             </p>
             <SwatchCalc />
 
@@ -182,11 +185,11 @@ export default function SwatchGuide() {
               <ExampleLine r={example.rows} unit="段" label="段数" />
             </div>
             <p>
-              {"出した10cmあたりの値は、小数のままでも、整数に丸めた値でも、計算ツールのゲージに入力できます。"}
+              <Words text="出した10cmあたりの値は、小数のままでも、整数に丸めた値でも、計算ツールのゲージに入力できます。" />
             </p>
             <p className="faq__more">
               <Link href={GAUGE_GUIDE_PATH}>
-                ゲージから目数・段数を出す方法（計算式と早見表）
+                <Words text="ゲージから目数・段数を出す方法（計算式と早見表）" />
               </Link>
             </p>
           </div>
@@ -206,7 +209,7 @@ export default function SwatchGuide() {
           <div className="container container-narrow">
             <h2 id="cta-heading">測ったゲージで計算する</h2>
             <p>
-              {"計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。"}
+              <Words text="計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。" />
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">

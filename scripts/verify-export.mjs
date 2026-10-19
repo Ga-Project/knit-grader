@@ -29,7 +29,7 @@ import { SITE_URL, OG_IMAGE_URL, GOATCOUNTER_CODE } from "../app/config.ts";
 import { countForLength } from "../lib/grading.ts";
 import { findEquationErrors, finishedCm } from "../lib/calc-text.ts";
 import { GAUGE_GUIDE_PATH } from "../lib/gauge-guide.ts";
-import { isValidPhraseBoundary } from "../lib/phrases.ts";
+import { CORE_WORDS } from "../lib/core-words.ts";
 import {
   findFaqIntegerErrors,
   findIntegerClaimErrors,
@@ -382,6 +382,10 @@ function checkFaqAndCrumbs(rel, html, text, { pageUrl, min, max }) {
     if (items.length !== detailsCount) {
       fail(`${rel}: FAQPage ${items.length} 件と本文の FAQ ${detailsCount} 件が一致しない`);
     }
+    const summaries = [...html.matchAll(/<summary\b[^>]*>(.*?)<\/summary>/gs)].map((m) => textOf(m[1]));
+    items.forEach((q, i) => {
+      if (summaries[i] !== q.name) fail(`${rel}: FAQ の質問（見出し）の textContent「${summaries[i]}」が JSON-LD の質問「${q.name}」と一致しない`);
+    });
     for (const q of items) {
       if (!text.includes(q.name)) fail(`${rel}: FAQPage の質問が本文に無い: ${q.name}`);
       const a = q.acceptedAnswer?.text ?? "";
@@ -494,30 +498,42 @@ function checkMarkers(rel, html) {
   }
 }
 
-/** 有料機能・課金・書き出しを示す語（無料のままであることの検査）。 */
-const PAID_TERMS = /有料|課金|書き出し|エクスポート|サブスク|プレミアム|Pro版|料金|プラン|月額|年額|購入|決済|ライセンス/;
+/**
+ * 有料機能・課金・書き出しを示す語（無料のままであることの検査）。
+ * 「購入」「書き出し」「プラン」は誤検知しやすい語だが、現状の公開物には出ないので拒否リストに入れている。
+ * 将来これらの語を含む文言（例「プランを立てる」「書き出した HTML」）を加えると、この検査が落ちる。
+ * そのときは文言を言い換えるか、語を拒否リストから外す判断をここで明示的に行うこと。
+ */
+const PAID_TERMS =
+  /有料|有償|課金|書き出し|エクスポート|サブスク|プレミアム|料金|価格|プラン|月額|年額|購入|決済|お支払い|ライセンス|ペイウォール|会員限定|Pro版|\bpro\b|premium|upgrade/i;
+
+/** 値に URL・識別子が入る属性（有料語の走査から除く）。 */
+const NON_TEXT_ATTRS = new Set(["href", "src", "srcset", "action", "formaction", "poster", "data", "class", "id", "style", "rel", "as", "type", "charset", "crossorigin", "integrity", "nonce", "for", "name", "role", "viewbox", "d", "fill", "stroke"]);
 
 /**
- * 全ページ: 本文・meta（description/og/twitter）・JSON-LD・読み上げ/表示用の属性（alt/aria-label/title/placeholder）の
- * いずれにも有料機能を示す語が無いこと。
+ * 全ページ: 本文・meta（description/keywords/og/twitter を含むすべての content）・JSON-LD・
+ * 属性の値（alt/aria-label/aria-description/title/placeholder/value/data-* ほか、URL と識別子の属性以外）・
+ * HTML コメントのいずれにも有料機能を示す語が無いこと。
  */
 function checkNoPaidTerms(rel, html) {
   const blocks = [...html.matchAll(/<script\s+type="application\/ld\+json"[^>]*>(.*?)<\/script>/gs)].map((m) => m[1]);
-  const metaTexts = tags(html, "meta")
-    .filter((a) => /^(description|og:|twitter:)/.test(a.name ?? a.property ?? ""))
-    .map((a) => a.content ?? "");
+  const comments = [...html.matchAll(/<!--(.*?)-->/gs)].map((m) => m[1]).filter((c) => c.trim() !== "");
   const attrTexts = [];
   for (const m of html.matchAll(/<(\w+)\b([^>]*)>/g)) {
+    if (m[1].toLowerCase() === "script" || m[1].toLowerCase() === "style") continue;
     const attrs = parseAttrs(m[2]);
-    for (const name of ["alt", "aria-label", "title", "placeholder"]) {
-      if (attrs[name]) attrTexts.push(attrs[name]);
+    for (const [name, value] of Object.entries(attrs)) {
+      if (!value || NON_TEXT_ATTRS.has(name)) continue;
+      if (name === "content" || name === "title" || name === "alt" || name === "placeholder" || name === "value" || name.startsWith("aria-") || name.startsWith("data-")) {
+        attrTexts.push(value);
+      }
     }
   }
   const sources = [
     ["本文", visibleText(html)],
-    ["meta", metaTexts.join("\n")],
     ["JSON-LD", blocks.join("\n")],
-    ["属性(alt/aria-label/title/placeholder)", attrTexts.join("\n")],
+    ["属性(content/alt/aria-*/title/placeholder/value/data-*)", attrTexts.join("\n")],
+    ["HTMLコメント", comments.join("\n")],
   ];
   for (const [where, value] of sources) {
     const m = value.match(PAID_TERMS);
@@ -526,26 +542,69 @@ function checkNoPaidTerms(rel, html) {
 }
 
 /**
- * 隣り合う Phrased の片（<span class="phrase">）の境界が、折り返してよい位置（lib/phrases.ts の規則）か。
- * ひらがなの後ろ（助詞でない）や、漢字・カタカナ・英数の後ろ（句読点・閉じ括弧でない）で区切っている
- * ＝語の途中で切っているものが 1 件でもあれば失敗にする。
+ * 隣り合う文節の塊（<span class="phrase">）の境界が、語の途中で切れていないか。
+ * 生成側（lib/phrases.ts の isValidPhraseBoundary）とは別に、ここで最小限の規則を独立に持つ:
+ *   ひらがなの後ろ → 助詞（から・まで・より・は・が・を・に・で・の・と・も・へ・や）の直後で、次がひらがなでないときだけ可
+ *   漢字・カタカナ・英数の後ろ → 句読点・閉じ括弧の直後、または次が開き括弧のときだけ可（ひらがな・漢字の途中は不可）
+ *   空白の前後・句読点の直後は可
  */
+const HIRAGANA_RE = /[\u3041-\u309f]/;
+function splitsInsideWord(x, y) {
+  const a = [...x].at(-1);
+  const b = [...y][0];
+  if (a === undefined || b === undefined) return false;
+  if (/\s/.test(a) || /\s/.test(b)) return false;
+  if (/[、。，．！？・：；]/.test(a)) return false;
+  if (/[（「『【〔〈《(\[“‘]/.test(b)) return false;
+  if (/[）」』】〕〉》)\]”’]/.test(a) && !HIRAGANA_RE.test(b)) return false;
+  if (HIRAGANA_RE.test(a)) {
+    if (HIRAGANA_RE.test(b)) return true;
+    return !/(?:^|[^\u3041-\u309f])(?:から|まで|より|[はがをにでのともへや])$/.test(x);
+  }
+  return true;
+}
+
 function checkPhraseBoundaries(rel, html) {
   const spans = [...html.matchAll(/<span class="phrase">([^<]*)<\/span>/g)];
   let prev = null;
   let checked = 0;
   for (const m of spans) {
     const text = decodeEntities(m[1]);
+    if (text.trim() !== text || text === "") fail(`${rel}: 文節の塊の前後に空白がある／空: 「${text}」`);
     const start = m.index;
     if (prev && prev.end === start) {
       checked += 1;
-      if (!isValidPhraseBoundary(prev.text, text)) {
+      if (splitsInsideWord(prev.text, text)) {
         fail(`${rel}: 語の途中で区切っている「${prev.text.slice(-6)}|${text.slice(0, 6)}」`);
       }
     }
     prev = { text, end: start + m[0].length };
   }
   return checked;
+}
+
+/**
+ * 核になる語（lib/core-words.ts）が、長文（<p> と FAQ の回答）の中で、すべて折り返さない塊
+ * （<span class="nowrap core">、または文節の塊・nowrap の span）に入っていること。
+ * 塊に入っていない出現が 1 つでもあれば失敗にする。塊の数も数え、0 件（機能が外れた）なら失敗にする。
+ */
+function checkCoreWords(rel, html) {
+  const body = stripNonContent(html.slice(html.indexOf("<body")));
+  const protectedSpans = /<span class="(?:phrase|nowrap)[^"]*"[^>]*>.*?<\/span>/gs;
+  const covered = (body.match(/<span class="nowrap core">/g) ?? []).length;
+  const without = body.replace(protectedSpans, "\u0000");
+  const blocks = [
+    ...without.matchAll(/<p\b[^>]*>(.*?)<\/p>/gs),
+    ...without.matchAll(/<div class="faq__body">(.*?)<\/div>/gs),
+  ];
+  for (const m of blocks) {
+    const text = decodeEntities(m[1].replace(/<!--.*?-->/gs, "").replace(/<[^>]+>/g, ""));
+    for (const word of CORE_WORDS) {
+      const idx = text.indexOf(word);
+      if (idx >= 0) fail(`${rel}: 核語「${word}」が折り返さない塊に入っていない（…${text.slice(Math.max(0, idx - 8), idx + word.length + 8)}…）`);
+    }
+  }
+  return covered;
 }
 
 /**
@@ -682,6 +741,7 @@ function main() {
     checkCommon(rel, html);
     checkNoPaidTerms(rel, html);
     checkPhraseBoundaries(rel, html);
+    if (checkCoreWords(rel, html) === 0 && /(^|\/)(swatch|gauge)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
   }
 
   for (const loc of locs) {

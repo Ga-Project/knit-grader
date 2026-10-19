@@ -4,6 +4,7 @@
 // 入力は保存しない（ストレージなし）。換算の実体は lib/grading.ts の per10cmFromCount、
 // 表示する状態の分岐は lib/swatch-guide.ts の swatchRowState（単体テスト済み）。
 // 結果欄は高さを固定し、空・エラー・結果のどれでも下の要素が動かない。
+import { Words } from "../Words";
 import { useState } from "react";
 import Link from "next/link";
 import { MAX_MEASURE, MIN_MEASURE } from "@/lib/grading";
@@ -150,7 +151,9 @@ export function SwatchCalc() {
         lengthPlaceholder="12"
       />
       <p className="swatch-calc__next">
-        <Link href="/">出たゲージで目数・段数を計算する</Link>
+        <Link href="/">
+          <Words text="出たゲージで目数・段数を計算する" />
+        </Link>
       </p>
     </div>
   );

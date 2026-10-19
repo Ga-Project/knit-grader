@@ -7,6 +7,7 @@
 //   tabIndex=0 でキーボードからフォーカスして矢印キーでスクロールできるようにする。
 //   はみ出していないのにタブ停止や案内を出すと、誤った手掛かりになるため実測で切り替える。
 // - まだ右に続きがあるときは右端に内側の影を出す（data-more）。
+import { Words } from "./Words";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -45,7 +46,7 @@ export function ScrollRegion({ titleId, title, hintId, children }: Props) {
   return (
     <div className="chart-block">
       <p id={titleId} className="chart-title">
-        {title}
+        <Words text={title} />
       </p>
       <p id={hintId} className="chart-scroll__hint" hidden={!overflowing}>
         {"表は横にスクロールできます。左端の列は固定されます。"}

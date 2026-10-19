@@ -31,7 +31,7 @@ export default function NotFound() {
               </span>
             </h1>
             <p className="hero-lead">
-              <Phrased text="お探しのページは見つかりませんでした。移動・削除されたか、URL が誤っている可能性があります。" />
+              <Phrased text="お探しのページは見つかりませんでした。移動・削除されたか、URLが誤っている可能性があります。" />
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">

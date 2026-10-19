@@ -867,16 +867,22 @@
   vertical-align: baseline;
 }
 
-/* 本文が狭い容器のページも、左端はヘッダー・トップと同じ位置にそろえる（中央寄せにしない）。
-   幅は読みやすい 44rem のまま。ブランドの位置がページ間で動かず、ヘッダーと本文の左端が一致する。 */
+/* 本文が狭い容器（.container-narrow）のページも、左端はヘッダー・トップと同じ位置にそろえる（中央寄せにしない）。
+   意図: ブランドの位置がページ間で動かず、ヘッダーと本文の左端が一致する。幅は読みやすい 44rem のまま。
+   広い画面で右側が空くのは許容（トップは 2 カラムの道具で幅を使い、本文ページは読みやすさを優先する）。 */
 .container-narrow {
   margin-left: max(0px, calc((100% - var(--container)) / 2));
   margin-right: auto;
 }
 
-/* 404 の大見出し: 狭い画面でも「見つかりません」が語の途中で折れない大きさにする */
+/* 404 の大見出し: 他ページの hero（.hero-band h1）と同じ書体・サイズ体系にする。
+   320px 幅でも「見つかりません」が 1 かたまりで収まる（30.4px × 7 字 ≒ 213px < 見出し幅）。 */
 .hero h1 {
-  font-size: clamp(1.75rem, 8.2vw, var(--fs-3xl));
+  font-family: var(--font-craft);
+  font-weight: var(--fw-bold);
+  font-size: clamp(1.9rem, 5.2vw, 2.9rem);
+  letter-spacing: var(--tracking-tight);
+  max-width: 20ch;
 }
 
 /* 入力欄の枠は、背景に対して 3:1 以上（非テキストのコントラスト）。light/dark とも表の罫と同じトークン */
@@ -917,10 +923,15 @@ body {
   font-size: var(--fs-base);
 }
 .swatch-calc__out {
-  /* 結果が最大（8桁ずつの入力・注記が2行・320px幅）でも収まる高さに固定し、状態が変わっても下が動かない */
-  min-height: 8.5rem;
+  /* 結果欄は空・エラー・結果のどれでも同じ高さに固定する（幅ごとに、全状態の最大を実測して決めた値）。状態が変わっても下が動かない */
+  min-height: 8rem; /* 480px 未満: 最悪（8桁ずつの入力・式と注記が2行）で 123px */
   border-left: 3px solid var(--accent);
   padding-left: var(--sp-4);
+}
+@media (min-width: 480px) {
+  .swatch-calc__out {
+    min-height: 7rem; /* 480px 以上: 最悪で 111px */
+  }
 }
 .swatch-calc__out.is-empty {
   border-left-color: var(--table-rule);
@@ -958,12 +969,11 @@ body {
 .swatch-calc__calc {
   margin: var(--sp-1) 0 0;
   font-family: var(--font-mono);
-  /* 入力は最大 8 文字ずつなので、320px 幅でも 1 行に収まる大きさにする（折り返すと結果欄が伸びる） */
-  font-size: clamp(0.7rem, 3.3vw, 0.875rem);
+  /* 12px 以上。入力は最大 8 文字ずつなので、狭い画面では 2 行に折れることがある（結果欄は 2 行ぶんの高さで固定） */
+  font-size: 0.75rem;
+  line-height: 1.4;
   color: var(--text-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .swatch-calc__note,
 .swatch-calc__hint {

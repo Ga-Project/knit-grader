@@ -1,5 +1,6 @@
 "use client";
 
+import { Words } from "./Words";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { analyzeGaugeInputs, restoreSaved } from "@/lib/gauge-input";
 import { STORAGE_KEY } from "./config";
@@ -337,8 +338,8 @@ export function GaugeTool() {
             </div>
             {custom && w !== null && l !== null && (
               <p className="swatch-caption">
-                仕上がり <b>{w}cm</b> × <b>{l}cm</b>{" "}
-                を、このゲージで編むと
+                <Words text="仕上がり" /> <b>{w}cm</b> × <b>{l}cm</b>{" "}
+                <Words text="を、このゲージで編むと" />
                 <b> {custom.stitches}目</b> ×<b> {custom.rows}段</b>
               </p>
             )}

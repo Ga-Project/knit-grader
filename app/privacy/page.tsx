@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SiteHeader, SiteFooter } from "../chrome";
+import { Words } from "../Words";
 import { Phrased } from "../Phrased";
 import { pageMetadata } from "../seo";
 
@@ -27,12 +28,12 @@ export default function Privacy() {
 
             <h2><Phrased text="入力データの保存" /></h2>
             <p>
-              {"ゲージや寸法などの入力内容は、お使いのブラウザ内（localStorage）にのみ保存されます。当サイトのサーバーへ送信・保存されることはありません。データはご自身の端末に残り、「入力を消去」ボタンやブラウザの設定からいつでも削除できます。"}
+              <Words text="ゲージや寸法などの入力内容は、お使いのブラウザ内（localStorage）にのみ保存されます。当サイトのサーバーへ送信・保存されることはありません。データはご自身の端末に残り、「入力を消去」ボタンやブラウザの設定からいつでも削除できます。" />
             </p>
 
             <h2><Phrased text="アクセス解析" /></h2>
             <p>
-              {"サイト改善のため、Cookie を使わないアクセス解析（GoatCounter）で、ページの表示回数など個人を特定しない統計情報を計測する場合があります。個人を識別する情報は収集しません。"}
+              <Words text="サイト改善のため、Cookieを使わないアクセス解析（GoatCounter）で、ページの表示回数など個人を特定しない統計情報を計測する場合があります。個人を識別する情報は収集しません。" />
             </p>
           </div>
         </section>
