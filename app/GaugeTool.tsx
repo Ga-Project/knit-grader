@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MEASURE_ERROR, normalizeMeasureText, parseMeasure } from "@/lib/grading";
-import { analyzeGaugeInputs } from "@/lib/gauge-input";
+import { analyzeGaugeInputs, restoreSaved } from "@/lib/gauge-input";
 import { STORAGE_KEY } from "./config";
+import { Phrased } from "./Phrased";
 import { StitchMark } from "./StitchMark";
 
 interface Saved {
@@ -34,17 +34,13 @@ export function GaugeTool() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const data = JSON.parse(raw) as Partial<Saved>;
-        // 全角数字・カンマ小数など、いまの規則で解釈できる旧保存値は半角に正規化して復元する
-        // （復元バナーとエラーが同時に出ないようにする）。解釈できない値はそのまま見せてエラーにする。
-        const restoreText = (v: string | undefined): string => {
-          const text = v ?? "";
-          return parseMeasure(text) !== null ? normalizeMeasureText(text) : text;
-        };
-        setGaugeSt(restoreText(data.gaugeSt));
-        setGaugeRow(restoreText(data.gaugeRow));
-        setWidth(restoreText(data.width));
-        setLength(restoreText(data.length));
+        // 旧い保存値（全角数字・カンマ小数など）は半角に正規化して復元し、いまの規則で解釈できない値や
+        // 文字列でない値は、その欄だけ空にする（復元バナーとエラーが同時に出ない・他の欄を捨てない）。
+        const data = restoreSaved(JSON.parse(raw));
+        setGaugeSt(data.gaugeSt);
+        setGaugeRow(data.gaugeRow);
+        setWidth(data.width);
+        setLength(data.length);
         const hasValue = Boolean(
           data.gaugeSt || data.gaugeRow || data.width || data.length,
         );
@@ -118,7 +114,7 @@ export function GaugeTool() {
       <div className="container">
         <span className="eyebrow">ゲージ計算</span>
         <h2 id="tool-heading" style={{ marginTop: "var(--sp-2)" }}>
-          ゲージと仕上がり寸法を入れる
+          <Phrased text="ゲージと仕上がり寸法を入れる" />
         </h2>
 
         {restored && (
@@ -137,8 +133,8 @@ export function GaugeTool() {
           <form className="ws-panel" onSubmit={(e) => e.preventDefault()}>
             <div className="ws-panel__group">
               <div className="ws-panel__legend">
-                <span>ゲージ（10cm角）</span>
-                <small>試し編みの目数・段数</small>
+                <span><Phrased text="ゲージ（10cm角）" /></span>
+                <small><Phrased text="試し編みの目数・段数" /></small>
               </div>
               <div className="field-pair">
                 <div className="field">
@@ -149,13 +145,14 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
+                      maxLength={8}
                       placeholder="20"
                       value={gaugeSt}
                       onChange={(e) => {
                         interacted.current = true;
                         setGaugeSt(e.target.value);
                       }}
-                      aria-invalid={state.gaugeStBad}
+                      aria-invalid={state.gaugeStBad || tooSmall}
                       aria-describedby={describedBy(
                         state.gaugeStBad ? "gauge-error" : null,
                       )}
@@ -171,13 +168,14 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
+                      maxLength={8}
                       placeholder="28"
                       value={gaugeRow}
                       onChange={(e) => {
                         interacted.current = true;
                         setGaugeRow(e.target.value);
                       }}
-                      aria-invalid={state.gaugeRowBad}
+                      aria-invalid={state.gaugeRowBad || tooSmall}
                       aria-describedby={describedBy(
                         state.gaugeRowBad ? "gauge-error" : null,
                       )}
@@ -189,15 +187,15 @@ export function GaugeTool() {
               {state.gaugeBad && (
                 <p className="field-error" id="gauge-error">
                   <span aria-hidden="true">⚠ </span>
-                  {MEASURE_ERROR}
+                  {state.gaugeMessages.join("。")}
                 </p>
               )}
             </div>
 
             <div className="ws-panel__group">
               <div className="ws-panel__legend">
-                <span>仕上がり寸法</span>
-                <small>編む1枚の幅と丈</small>
+                <span><Phrased text="仕上がり寸法" /></span>
+                <small><Phrased text="編む1枚の幅と丈" /></small>
               </div>
               <div className="field-pair">
                 <div className="field">
@@ -208,13 +206,14 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
+                      maxLength={8}
                       placeholder="48"
                       value={width}
                       onChange={(e) => {
                         interacted.current = true;
                         setWidth(e.target.value);
                       }}
-                      aria-invalid={state.widthBad}
+                      aria-invalid={state.widthBad || tooSmall}
                       aria-describedby={describedBy(
                         state.widthBad ? "dims-error" : "dims-hint",
                       )}
@@ -230,13 +229,14 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
+                      maxLength={8}
                       placeholder="56"
                       value={length}
                       onChange={(e) => {
                         interacted.current = true;
                         setLength(e.target.value);
                       }}
-                      aria-invalid={state.lengthBad}
+                      aria-invalid={state.lengthBad || tooSmall}
                       aria-describedby={describedBy(
                         state.lengthBad ? "dims-error" : "dims-hint",
                       )}
@@ -248,7 +248,7 @@ export function GaugeTool() {
               {state.dimsBad && (
                 <p className="field-error" id="dims-error">
                   <span aria-hidden="true">⚠ </span>
-                  {MEASURE_ERROR}
+                  {state.dimsMessages.join("。")}
                 </p>
               )}
               {tooSmall && (
@@ -258,7 +258,7 @@ export function GaugeTool() {
                 </p>
               )}
               <p className="field-hint" id="dims-hint">
-                計算後もいつでも修正できます。入力は自動で保存され、消えません。
+                <Phrased text="計算後もいつでも修正できます。入力は自動で保存され、消えません。" />
               </p>
             </div>
 
@@ -328,9 +328,9 @@ export function GaugeTool() {
                   <span className="card-icon" aria-hidden="true">
                     <StitchMark size={22} />
                   </span>
-                  <h3>ここに編み地が現れます</h3>
+                  <h3><Phrased text="ここに編み地が現れます" /></h3>
                   <p>
-                    ゲージと仕上がり寸法を入れると、方眼の上に実寸比で描きます。
+                    <Phrased text="ゲージと仕上がり寸法を入れると、方眼の上に実寸比で描きます。" />
                   </p>
                 </div>
               )}

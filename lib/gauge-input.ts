@@ -1,6 +1,12 @@
 // ゲージ計算ツール（GaugeTool）の入力 4 欄から、画面に出す状態を決める純関数。
 // 結果文に出す寸法は入力欄の文字列ではなく解析済みの数値（w, l）を使う（「12.」「007」をそのまま出さない）。
-import { computeCounts, countsUsable, parseMeasure } from "./grading.ts";
+import {
+  computeCounts,
+  countsUsable,
+  measureErrorMessages,
+  normalizeMeasureText,
+  parseMeasure,
+} from "./grading.ts";
 
 export interface GaugeInputs {
   gaugeSt: string;
@@ -18,6 +24,9 @@ export interface GaugeInputState {
   lengthBad: boolean;
   /** 幅・丈の欄に解釈できない入力がある */
   dimsBad: boolean;
+  /** ゲージ欄・寸法欄のエラー文言（原因別・重複なし）。エラーがなければ空 */
+  gaugeMessages: string[];
+  dimsMessages: string[];
   w: number | null;
   l: number | null;
   /** 4 欄がそろい、目数・段数がともに 1 以上のときだけ値を持つ */
@@ -49,9 +58,38 @@ export function analyzeGaugeInputs(inputs: GaugeInputs): GaugeInputState {
     widthBad,
     lengthBad,
     dimsBad: widthBad || lengthBad,
+    gaugeMessages: measureErrorMessages([inputs.gaugeSt, inputs.gaugeRow]),
+    dimsMessages: measureErrorMessages([inputs.width, inputs.length]),
     w,
     l,
     counts: computed !== null && !tooSmall ? computed : null,
     tooSmall,
+  };
+}
+
+/** localStorage に保存する形（4 欄とも文字列）。 */
+export type SavedInputs = GaugeInputs;
+
+const EMPTY_SAVED: SavedInputs = { gaugeSt: "", gaugeRow: "", width: "", length: "" };
+
+/**
+ * 保存値の 1 欄を復元用の文字列にする。文字列でない値（数値・null など）・解釈できない値は空にし、
+ * 解釈できる値は半角に正規化する（旧い type=number 由来の「1e1」など、いまの規則で解釈できない値は
+ * 復元しない。復元バナーとエラーが同時に出ないようにする）。
+ */
+export function restoreField(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return parseMeasure(value) !== null ? normalizeMeasureText(value) : "";
+}
+
+/** 保存値（JSON.parse の結果）から 4 欄を復元する。欄ごとに守り、不正な欄だけ空にする。 */
+export function restoreSaved(data: unknown): SavedInputs {
+  if (typeof data !== "object" || data === null) return { ...EMPTY_SAVED };
+  const d = data as Record<string, unknown>;
+  return {
+    gaugeSt: restoreField(d.gaugeSt),
+    gaugeRow: restoreField(d.gaugeRow),
+    width: restoreField(d.width),
+    length: restoreField(d.length),
   };
 }

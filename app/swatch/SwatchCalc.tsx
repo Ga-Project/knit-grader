@@ -6,7 +6,7 @@
 // 結果欄は高さを固定し、空・エラー・結果のどれでも下の要素が動かない。
 import { useState } from "react";
 import Link from "next/link";
-import { MAX_MEASURE, MEASURE_ERROR, MIN_MEASURE } from "@/lib/grading";
+import { MAX_MEASURE, MIN_MEASURE } from "@/lib/grading";
 import {
   integerNote,
   per10cmParts,
@@ -38,7 +38,8 @@ function ConvertRow({
   const state = swatchRowState(count, length);
   const countBad = state.kind === "invalid" && state.countBad;
   const lengthBad = state.kind === "invalid" && state.lengthBad;
-  const hasError = state.kind === "invalid" || state.kind === "outOfRange";
+  const outOfRange = state.kind === "outOfRange";
+  const hasError = state.kind === "invalid" || outOfRange;
   const errId = `${id}-error`;
 
   return (
@@ -53,11 +54,12 @@ function ConvertRow({
               type="text"
               inputMode="decimal"
               autoComplete="off"
+              maxLength={8}
               placeholder={countPlaceholder}
               value={count}
               onChange={(e) => setCount(e.target.value)}
-              aria-invalid={countBad}
-              aria-describedby={countBad ? errId : undefined}
+              aria-invalid={countBad || outOfRange}
+              aria-describedby={countBad || outOfRange ? errId : undefined}
             />
             <span className="suffix">{unit}</span>
           </div>
@@ -70,11 +72,12 @@ function ConvertRow({
               type="text"
               inputMode="decimal"
               autoComplete="off"
+              maxLength={8}
               placeholder={lengthPlaceholder}
               value={length}
               onChange={(e) => setLength(e.target.value)}
-              aria-invalid={lengthBad}
-              aria-describedby={lengthBad ? errId : undefined}
+              aria-invalid={lengthBad || outOfRange}
+              aria-describedby={lengthBad || outOfRange ? errId : undefined}
             />
             <span className="suffix">cm</span>
           </div>
@@ -90,8 +93,10 @@ function ConvertRow({
           <>
             <p className="swatch-calc__num tabular">
               <span className="swatch-calc__label">10cmあたり</span>
-              <b>{per10cmText(state.result)}</b>
-              {unit}
+              <span className="swatch-calc__figure">
+                <b>{per10cmText(state.result)}</b>
+                {unit}
+              </span>
             </p>
             <p className="swatch-calc__calc tabular">
               {(() => {
@@ -99,12 +104,14 @@ function ConvertRow({
                 return `${p.expression} ${p.relation} ${p.value}`;
               })()}
             </p>
-            <p className="swatch-calc__note">{integerNote(state.result, unit)}</p>
+            <p className="swatch-calc__note">
+              {integerNote(state.result, unit)}
+            </p>
           </>
         ) : state.kind === "invalid" ? (
           <p className="field-error swatch-calc__error" id={errId}>
             <span aria-hidden="true">⚠ </span>
-            {MEASURE_ERROR}
+            {state.messages.join("。")}
           </p>
         ) : state.kind === "outOfRange" ? (
           <p className="field-error swatch-calc__error" id={errId}>
@@ -113,7 +120,7 @@ function ConvertRow({
           </p>
         ) : (
           <p className="swatch-calc__hint">
-            {countLabel}と測った長さを入れると、10cmあたりに換算します。
+            {`${countLabel}と測った長さを入れると、10cmあたりに換算します。`}
           </p>
         )}
       </div>

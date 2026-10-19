@@ -5,7 +5,9 @@ import assert from "node:assert/strict";
 import {
   MAX_MEASURE,
   MIN_MEASURE,
-  MEASURE_ERROR,
+  MEASURE_ERRORS,
+  measureErrorMessage,
+  measureErrorMessages,
   computeCounts,
   countForLength,
   countsUsable,
@@ -14,6 +16,7 @@ import {
   parseMeasure,
   per10cmFromCount,
   toIntegerGauge,
+  rawCountForLength,
   lengthForCount,
 } from "../lib/grading.ts";
 import {
@@ -30,7 +33,11 @@ import {
   per10cmResult,
   per10cmText,
 } from "../lib/swatch-guide.ts";
-import { analyzeGaugeInputs } from "../lib/gauge-input.ts";
+import { analyzeGaugeInputs, restoreField, restoreSaved } from "../lib/gauge-input.ts";
+import { isValidPhraseBoundary, splitPhrases } from "../lib/phrases.ts";
+import { exactCountForLength, exactPer10 } from "../lib/exact-check.ts";
+import { buildGaugeFaqs } from "../lib/gauge-guide.ts";
+import { formatDecimal } from "../lib/calc-text.ts";
 import { buildBreadcrumbJsonLd, buildFaqPageJsonLd } from "../lib/json-ld.ts";
 
 test("per10cmFromCount: 換算の基本と境界", () => {
@@ -172,7 +179,7 @@ test("入力の範囲: 受理するのは半角数字の MIN〜MAX_MEASURE だ�
     assert.equal(parseMeasure(bad), null, bad);
   }
   assert.equal(parseMeasure("12."), 12);
-  assert.ok(MEASURE_ERROR.includes(String(MAX_MEASURE)) && MEASURE_ERROR.includes(String(MIN_MEASURE)));
+  assert.ok(MEASURE_ERRORS.range.includes(String(MAX_MEASURE)) && MEASURE_ERRORS.range.includes(String(MIN_MEASURE)));
   assert.equal(isMeasure(Infinity), false);
   assert.equal(isMeasure(NaN), false);
 });
@@ -249,7 +256,6 @@ test("parseMeasure: 全角数字・全角ピリオド・カンマ小数は半角
   assert.equal(parseMeasure("1,250"), null);
   assert.equal(parseMeasure("1,2,3"), null);
   assert.equal(parseMeasure("１e3"), null);
-  assert.ok(MEASURE_ERROR.includes("半角") && MEASURE_ERROR.includes(String(MAX_MEASURE)));
 });
 
 test("analyzeGaugeInputs: 結果文に出す寸法は解析済みの数値で、入力の生文字列ではない", () => {
@@ -284,9 +290,9 @@ test("analyzeGaugeInputs: エラー・小さすぎ・空の各状態", () => {
 test("swatchRowState: 空・不正（どちらの欄か）・範囲外・結果の分岐", () => {
   assert.deepEqual(swatchRowState("", ""), { kind: "empty" });
   assert.deepEqual(swatchRowState("25", ""), { kind: "empty" });
-  assert.deepEqual(swatchRowState("abc", ""), { kind: "invalid", countBad: true, lengthBad: false });
-  assert.deepEqual(swatchRowState("25", "0"), { kind: "invalid", countBad: false, lengthBad: true });
-  assert.deepEqual(swatchRowState("x", "y"), { kind: "invalid", countBad: true, lengthBad: true });
+  assert.deepEqual(swatchRowState("abc", ""), { kind: "invalid", countBad: true, lengthBad: false, messages: [MEASURE_ERRORS.notNumber] });
+  assert.deepEqual(swatchRowState("25", "0"), { kind: "invalid", countBad: false, lengthBad: true, messages: [MEASURE_ERRORS.range] });
+  assert.deepEqual(swatchRowState("x", "y"), { kind: "invalid", countBad: true, lengthBad: true, messages: [MEASURE_ERRORS.notNumber] });
   assert.deepEqual(swatchRowState("1", String(MAX_MEASURE)), { kind: "outOfRange" });
   const ok = swatchRowState("２５", "12");
   assert.equal(ok.kind, "ok");
@@ -324,4 +330,294 @@ test("整数の案内の検査: +1 のずれ・言い切りの取り違えを検
   assert.ok(findFaqIntegerErrors("12cmで25目なら20.8目です。割り切れないので四捨五入して22目にします。").length > 0);
   assert.ok(findFaqIntegerErrors("12cmで36目なら30目です。割り切れないので、そのまま使えます。").length > 0);
   assert.ok(findFaqIntegerErrors("言及なし").length > 0);
+});
+
+test("measureErrorMessage: 原因別（数字でない／範囲外／桁区切り）。空・有効は null", () => {
+  assert.equal(measureErrorMessage(""), null);
+  assert.equal(measureErrorMessage("  "), null);
+  assert.equal(measureErrorMessage("25"), null);
+  assert.equal(measureErrorMessage("１２，５"), null);
+  for (const bad of ["abc", "1e3", "0x10", "5cm", "１a"]) {
+    assert.equal(measureErrorMessage(bad), MEASURE_ERRORS.notNumber, bad);
+  }
+  for (const bad of ["0", "0.5", "1001", "99999", "-5"]) {
+    assert.equal(measureErrorMessage(bad), MEASURE_ERRORS.range, bad);
+  }
+  for (const bad of ["1,250", "12,345", "１，２５０", "1,234,567", "12,345.5"]) {
+    assert.equal(measureErrorMessage(bad), MEASURE_ERRORS.separator, bad);
+  }
+  assert.ok(MEASURE_ERRORS.notNumber.includes("全角") && MEASURE_ERRORS.separator.includes("カンマ"));
+  assert.deepEqual(measureErrorMessages(["abc", "xyz", "0"]), [MEASURE_ERRORS.notNumber, MEASURE_ERRORS.range]);
+  assert.deepEqual(measureErrorMessages(["", "25"]), []);
+});
+
+test("正規化: IME の句点・読点、カンマ小数（1〜2桁・4桁以上は小数、3桁は桁区切りで無効）", () => {
+  assert.equal(parseMeasure("12。5"), 12.5);
+  assert.equal(parseMeasure("12、5"), 12.5);
+  assert.equal(parseMeasure("１２。５"), 12.5);
+  assert.equal(parseMeasure("1,25"), 1.25);
+  assert.equal(parseMeasure("1,2500"), 1.25);
+  assert.equal(parseMeasure("12,5"), 12.5);
+  assert.equal(parseMeasure("1,250"), null);
+  assert.equal(normalizeMeasureText("1,2500"), "1.2500");
+  assert.equal(normalizeMeasureText("1,250"), "1,250");
+});
+
+test("整数の案内: 浮動小数点誤差が出る入力でも「割り切れる」と判定する（許容幅の変異で落ちる）", () => {
+  const cases = [
+    [3.3, 1.1, 30],
+    [2.1, 1.4, 15],
+    [4.2, 1.4, 30],
+  ];
+  for (const [count, len, integer] of cases) {
+    // 浮動小数点では 29.999999999999996 などになる入力。厳密な演算では割り切れる（誤差なしの整数）
+    assert.equal(per10cmFromCount(count, len), integer, `${count}/${len}`);
+    assert.notEqual((count * 10) / len, integer, `${count}/${len} は浮動小数点の計算では誤差が出る入力`);
+    const r = per10cmResult(count, len);
+    assert.equal(r.integer, integer);
+    assert.equal(r.integerDiffers, false, `${count}/${len}`);
+    assert.equal(r.approx, false);
+    assert.equal(r.display, String(integer));
+    assert.ok(integerNote(r, "目").includes("そのまま使えます"));
+    assert.ok(!integerNote(r, "目").includes("四捨五入"));
+    assert.deepEqual(findIntegerClaimErrors(integerNote(r, "目"), count, len), []);
+    const faq = convertFaqAnswer(count, len);
+    assert.match(faq, /割り切れる/);
+    assert.deepEqual(findFaqIntegerErrors(faq), []);
+    assert.equal(per10cmParts(r).relation, "＝");
+  }
+});
+
+test("analyzeGaugeInputs: gaugeBad / dimsBad は欄ごとの不正を取りこぼさない", () => {
+  const base = { gaugeSt: "20", gaugeRow: "28", width: "48", length: "56" };
+  const onlyRow = analyzeGaugeInputs({ ...base, gaugeRow: "abc" });
+  assert.equal(onlyRow.gaugeStBad, false);
+  assert.equal(onlyRow.gaugeRowBad, true);
+  assert.equal(onlyRow.gaugeBad, true);
+  assert.equal(onlyRow.dimsBad, false);
+  const onlySt = analyzeGaugeInputs({ ...base, gaugeSt: "abc" });
+  assert.equal(onlySt.gaugeBad, true);
+  const onlyLength = analyzeGaugeInputs({ ...base, length: "abc" });
+  assert.equal(onlyLength.lengthBad, true);
+  assert.equal(onlyLength.widthBad, false);
+  assert.equal(onlyLength.dimsBad, true);
+  assert.equal(onlyLength.gaugeBad, false);
+  const onlyWidth = analyzeGaugeInputs({ ...base, width: "0" });
+  assert.equal(onlyWidth.dimsBad, true);
+  assert.deepEqual(onlyWidth.dimsMessages, [MEASURE_ERRORS.range]);
+  assert.deepEqual(onlyRow.gaugeMessages, [MEASURE_ERRORS.notNumber]);
+  const none = analyzeGaugeInputs(base);
+  assert.equal(none.gaugeBad || none.dimsBad, false);
+  assert.deepEqual([...none.gaugeMessages, ...none.dimsMessages], []);
+});
+
+test("restoreSaved: 文字列でない値・解釈できない値はその欄だけ空にし、他の欄は復元する", () => {
+  assert.deepEqual(restoreSaved({ gaugeSt: "２０", gaugeRow: 28, width: "1e1", length: "56" }), {
+    gaugeSt: "20",
+    gaugeRow: "",
+    width: "",
+    length: "56",
+  });
+  assert.deepEqual(restoreSaved({ gaugeSt: null, gaugeRow: {}, width: [], length: true }), {
+    gaugeSt: "",
+    gaugeRow: "",
+    width: "",
+    length: "",
+  });
+  for (const bad of [null, undefined, 5, "x", true]) {
+    assert.deepEqual(restoreSaved(bad), { gaugeSt: "", gaugeRow: "", width: "", length: "" });
+  }
+  assert.equal(restoreField("12,5"), "12.5");
+  assert.equal(restoreField("abc"), "");
+  assert.equal(restoreField(undefined), "");
+  assert.equal(restoreField("1e1"), "");
+});
+
+test("四捨五入の境界（.5 ちょうど）を外さない: 既知の再現ケース", () => {
+  // 11 ÷ 8.8 × 10 = 12.5 ちょうど（浮動小数点では 12.499… になり 12 へ丸まっていた）
+  const r = per10cmResult(11, 8.8);
+  assert.equal(r.display, "12.5");
+  assert.equal(r.approx, false);
+  assert.equal(r.integer, 13);
+  assert.equal(r.integerDiffers, true);
+  assert.ok(integerNote(r, "目").includes("四捨五入して13目"));
+  assert.equal(per10cmResult(11, 17.6).display, "6.3"); // 6.25 ちょうど → 6.3
+  assert.equal(countForLength(15, 41), 62); // 61.5
+  assert.equal(countForLength(25, 5.8), 15); // 14.5
+  assert.equal(countForLength(25, 6.6), 17); // 16.5
+  assert.equal(toIntegerGauge(12.5), 13);
+  assert.equal(toIntegerGauge(0.5 + 12), 13);
+  assert.equal(formatDecimal(1.15), "1.2"); // 小数第 1 位の境界も 10 進どおり
+  assert.equal(formatDecimal(6.25), "6.3");
+  assert.equal(formatDecimal(2.05), "2.1");
+  assert.equal(rawCountForLength(15, 41), 61.5);
+  assert.equal(lengthForCount(20, 43), 21.5);
+});
+
+test("全探索: countForLength は厳密な四捨五入と一致する（ゲージ5〜60 × 幅5.0〜150.0cm・0.1刻み）", () => {
+  let n = 0;
+  let ties = 0;
+  for (let per = 5; per <= 60; per += 1) {
+    for (let t = 50; t <= 1500; t += 1) {
+      const lenText = `${Math.floor(t / 10)}.${t % 10}`;
+      const expected = Number(exactCountForLength(String(per), lenText));
+      const actual = countForLength(per, Number(lenText));
+      if (actual !== expected) assert.fail(`${per}目 × ${lenText}cm: ${actual}（厳密 ${expected}）`);
+      if ((per * t) % 100 === 50) ties += 1; // per × len ÷ 10 の端数がちょうど .5
+      n += 1;
+    }
+  }
+  assert.ok(n > 80000);
+  assert.ok(ties > 1000, `.5 ちょうどのケースが ${ties} 件`);
+});
+
+test("全探索: per10cmResult は厳密な値と一致する（整数 1〜30 × 長さ30.0〜300.0cm・0.1刻み）", () => {
+  let n = 0;
+  let ties = 0;
+  for (let count = 1; count <= 30; count += 1) {
+    for (let t = 300; t <= 3000; t += 1) {
+      const lenText = `${Math.floor(t / 10)}.${t % 10}`;
+      const r = per10cmResult(count, Number(lenText));
+      // 結果が 1 未満（count × 100 ÷ (長さ×10) < 1）なら範囲外で null
+      if (count * 100 < t) {
+        assert.equal(r, null, `${count}/${lenText}`);
+        continue;
+      }
+      const e = exactPer10(String(count), lenText);
+      assert.ok(r !== null, `${count}/${lenText}`);
+      assert.equal(r.display, e.tenths, `表示 ${count}/${lenText}`);
+      assert.equal(String(r.integer), e.integer, `整数 ${count}/${lenText}`);
+      assert.equal(r.integerDiffers, !e.isInteger, `割り切れ ${count}/${lenText}`);
+      assert.equal(r.approx, !e.isTenth, `近似 ${count}/${lenText}`);
+      if (!e.isInteger && e.isTenth && e.tenths.endsWith(".5")) ties += 1;
+      n += 1;
+    }
+  }
+  assert.ok(n > 30000);
+  assert.ok(ties > 30, `整数への .5 ちょうどが ${ties} 件`);
+});
+
+test("parseMeasure: 「.5」は読める数（範囲外）、負数は範囲外、丸数字は数字でない", () => {
+  assert.equal(parseMeasure(".5"), null);
+  assert.equal(measureErrorMessage(".5"), MEASURE_ERRORS.range);
+  assert.equal(parseMeasure(".50"), null);
+  assert.equal(measureErrorMessage("-5"), MEASURE_ERRORS.range);
+  assert.equal(measureErrorMessage("-0.5"), MEASURE_ERRORS.range);
+  assert.equal(measureErrorMessage("."), MEASURE_ERRORS.notNumber);
+  assert.equal(measureErrorMessage("--5"), MEASURE_ERRORS.notNumber);
+  for (const bad of ["①", "②０", "１²", "５㎝", "⑩"]) {
+    assert.equal(parseMeasure(bad), null, bad);
+    assert.equal(measureErrorMessage(bad), MEASURE_ERRORS.notNumber, bad);
+  }
+  assert.equal(parseMeasure("１２．５"), 12.5);
+  assert.equal(parseMeasure("２５"), 25);
+  assert.equal(normalizeMeasureText("５"), "5");
+});
+
+test("splitPhrases: 連結すると元に戻り、助詞・句読点・括弧・空白の後でしか切れない", () => {
+  assert.deepEqual(splitPhrases("測りたい10cmより大きめに編む"), ["測りたい10cmより", "大きめに編む"]);
+  assert.deepEqual(splitPhrases("ひと回り大きめに"), ["ひと回り大きめに"]);
+  assert.deepEqual(splitPhrases("ゲージが合わなくても、目数と段数がすぐ決まる。"), [
+    "ゲージが",
+    "合わなくても、",
+    "目数と",
+    "段数がすぐ決まる。",
+  ]);
+  assert.deepEqual(splitPhrases("試し編みの目数"), ["試し編みの目数"]);
+  assert.deepEqual(splitPhrases("編み図の数字"), ["編み図の", "数字"]); // 助詞「の」（図の直後）の後ろでだけ切れる
+  assert.deepEqual(splitPhrases("割り算と掛け算"), ["割り算と", "掛け算"]);
+  assert.deepEqual(splitPhrases("（スワッチ）の10cm四方に"), ["（スワッチ）の", "10cm四方に"]);
+  assert.deepEqual(splitPhrases(""), []);
+  assert.deepEqual(splitPhrases("あ いう"), ["あ", " ", "いう"]);
+  const expr = splitPhrases("25目なら、25 ÷ 12 × 10≈20.8目です。割り切れる").find((p) => p.includes("÷"));
+  assert.equal(expr, "25 ÷ 12 × 10≈20.8目です。");
+});
+
+test("isValidPhraseBoundary: 語の途中の区切りを拒否する", () => {
+  // 許される: 句読点・助詞（非ひらがなの直後）・括弧・空白
+  assert.ok(isValidPhraseBoundary("合わなくても、", "目数と"));
+  assert.ok(isValidPhraseBoundary("ゲージが", "合わなく"));
+  assert.ok(isValidPhraseBoundary("10cmより", "大きめ"));
+  assert.ok(isValidPhraseBoundary("（スワッチ）の", "10cm"));
+  assert.ok(isValidPhraseBoundary("編む", "（括弧"));
+  // 拒否: 語の途中（ひらがな|漢字、漢字|ひらがな、漢字|漢字、助詞でないひらがなの後）
+  for (const [x, y] of [
+    ["試し", "編み"],
+    ["編み", "図"],
+    ["割り", "算"],
+    ["割り", "切れ"],
+    ["ひと", "回り"],
+    ["編み", "地が"],
+    ["入れ", "直す"],
+    ["仕上がり", "寸法"],
+    ["よくある", "質問"],
+    ["編", "み"],
+    ["試", "し編み"],
+    ["目数", "段数"],
+    ["編み比べ", "ると"],
+    ["ゲージが", "ある"], // 助詞の直後でも、次がひらがななら語の途中
+  ]) {
+    assert.equal(isValidPhraseBoundary(x, y), false, `${x}|${y}`);
+  }
+});
+
+test("splitPhrases: 実ページの全入力で連結が元に戻り、全境界が規則どおり（語の途中で切れない）", () => {
+  const inputs = [
+    ...buildSwatchFaqs().map((f) => f.q),
+    ...buildGaugeFaqs().map((f) => f.q),
+    "ゲージは、試し編み（スワッチ）の10cm四方に入る目数と段数です。編んで、洗って乾かして、中央で数え、10cmあたりに換算する。この4つの手順で測れます。",
+    "10cm角のゲージと仕上がり寸法を入れるだけ。必要な目数・段数をその場で同時に計算します。入力は自動保存で消えず、あとから何度でも編集できます。",
+    "試し編みの10cm角に入る目数と段数（ゲージ）が分かれば、編みたい幅と丈に必要な目数・段数は割り算と掛け算で決まります。",
+    "ゲージが合わなくても、",
+    "目数と段数がすぐ決まる。",
+    "測りたい10cmより大きめに編む",
+    "本番と同じ洗い方・仕上げ方で乾かす",
+    "平らに置き、中央で数える",
+    "10cmあたりに換算する",
+    "スワッチを測る",
+    "4つの手順",
+    "数えた数から",
+    "10cmあたりを出す",
+    "ゲージ（10cm角）",
+    "試し編みの目数・段数",
+    "仕上がり寸法",
+    "編む1枚の幅と丈",
+    "ここに編み地が現れます",
+    "計算後もいつでも修正できます。入力は自動で保存され、消えません。",
+    "ゲージと仕上がり寸法を入れると、方眼の上に実寸比で描きます。",
+    "壊れない（自動保存で消えない）",
+    "あとから何度でも編集できる",
+    "目数と段数を同時に計算",
+    "計算より、消えないことと後編集",
+    "3ステップで、目数・段数まで",
+    "よくある質問",
+    "ゲージと目数計算のよくある質問",
+    "ゲージを測る",
+    "仕上がり寸法を入れる",
+    "そのまま編み始める",
+    "ゲージは「1cmに何目入るか」の手がかり",
+    "計算式と実例",
+    "10cmあたりの目数と幅から見る早見表",
+    "自分のゲージが指定と違うとき",
+    "自分のゲージで計算する",
+    "入力データの保存",
+    "アクセス解析",
+    "25目（12cmで25目）",
+    "お探しのページは見つかりませんでした。移動・削除されたか、URL が誤っている可能性があります。",
+    "整数で使うなら四捨五入して21目",
+    "整数のゲージとしてそのまま使えます（30段）",
+  ];
+  let boundaries = 0;
+  for (const t of inputs) {
+    const parts = splitPhrases(t);
+    assert.equal(parts.join(""), t);
+    for (let i = 0; i + 1 < parts.length; i += 1) {
+      const a = parts[i];
+      const b = parts[i + 1];
+      if (/^\s+$/.test(a) || /^\s+$/.test(b)) continue;
+      boundaries += 1;
+      assert.ok(isValidPhraseBoundary(a, b), `語の途中: ${a}|${b}（${t.slice(0, 20)}…）`);
+    }
+  }
+  assert.ok(boundaries > 40);
 });

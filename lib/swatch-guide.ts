@@ -3,22 +3,30 @@
 // 本文の実例・FAQ の数字は grading.ts の換算関数から導出し、手書きの数値を置かない。
 // 「＝」「≈」「約」「ちょうど」の言い切りも入力値からではなく計算結果から決める。
 // 表示は小数第1位まで（calc-text.ts の formatDecimal と同じ丸め）。整数のゲージとして使うときは四捨五入。
-import { parseMeasure, per10cmFromCount, toIntegerGauge } from "./grading.ts";
-import { formatDecimal, isApprox } from "./calc-text.ts";
+import {
+  fracIsInteger,
+  fracRoundHalfUp,
+  fracRoundTenths,
+  fracToNumber,
+  measureErrorMessages,
+  parseMeasure,
+  per10cmFrac,
+} from "./grading.ts";
+import { exactPer10 } from "./exact-check.ts";
 import type { FaqItem } from "./json-ld.ts";
 
 /** サイト内でのページのパス（trailingSlash:true に合わせ末尾スラッシュ）。 */
 export const SWATCH_GUIDE_PATH = "/swatch/";
 
 const EPSILON = 1e-9;
-/** 表示桁で丸めたときの最大誤差は表示桁の半分。 */
+/** 表示桁で丸めたときの最大誤差は表示桁の半分（テキスト中の「≈」「＝」の表示値の検査用）。 */
 const HALF = 0.5;
 
 /** 数えた数と測った長さから出した 10cm あたりの値と、その表示。 */
 export interface Per10cmResult {
   count: number;
   lengthCm: number;
-  /** 丸める前の値 */
+  /** 丸める前の値（最も近い数。表示・判定は下の厳密な値から決める） */
   raw: number;
   /** 表示（小数第1位まで。整数ならそのまま整数） */
   display: string;
@@ -30,19 +38,29 @@ export interface Per10cmResult {
   integerDiffers: boolean;
 }
 
-/** 不正な入力（1 未満・非有限）は null。 */
+/** 小数第1位の 10 倍（整数）を「20.8」「30」の文字列にする。 */
+function formatTenths(tenths: bigint): string {
+  const whole = tenths / 10n;
+  const frac = tenths % 10n;
+  return frac === 0n ? String(whole) : `${whole}.${frac}`;
+}
+
+/**
+ * 不正な入力（範囲外・非有限）は null。割り算・四捨五入・「ちょうどか」の判定はすべて
+ * 整数演算（grading.ts の分数）で行い、浮動小数点の誤差で .5 の境界や「割り切れる」を外さない。
+ */
 export function per10cmResult(count: number, lengthCm: number): Per10cmResult | null {
-  const raw = per10cmFromCount(count, lengthCm);
-  if (raw === null) return null;
-  const integer = toIntegerGauge(raw);
+  const f = per10cmFrac(count, lengthCm);
+  if (f === null) return null;
+  const tenths = fracRoundTenths(f);
   return {
     count,
     lengthCm,
-    raw,
-    display: formatDecimal(raw),
-    approx: isApprox(raw),
-    integer,
-    integerDiffers: Math.abs(raw - integer) > EPSILON,
+    raw: fracToNumber(f),
+    display: formatTenths(tenths),
+    approx: !fracIsInteger({ n: f.n * 10n, d: f.d }),
+    integer: Number(fracRoundHalfUp(f)),
+    integerDiffers: !fracIsInteger(f),
   };
 }
 
@@ -146,7 +164,7 @@ export function buildSwatchFaqs(): FaqItem[] {
 
 export type SwatchRowState =
   | { kind: "empty" }
-  | { kind: "invalid"; countBad: boolean; lengthBad: boolean }
+  | { kind: "invalid"; countBad: boolean; lengthBad: boolean; messages: string[] }
   | { kind: "outOfRange" }
   | { kind: "ok"; result: Per10cmResult };
 
@@ -159,7 +177,9 @@ export function swatchRowState(countText: string, lengthText: string): SwatchRow
   const l = parseMeasure(lengthText);
   const countBad = countText.trim() !== "" && c === null;
   const lengthBad = lengthText.trim() !== "" && l === null;
-  if (countBad || lengthBad) return { kind: "invalid", countBad, lengthBad };
+  if (countBad || lengthBad) {
+    return { kind: "invalid", countBad, lengthBad, messages: measureErrorMessages([countText, lengthText]) };
+  }
   if (c === null || l === null) return { kind: "empty" };
   const result = per10cmResult(c, l);
   return result === null ? { kind: "outOfRange" } : { kind: "ok", result };
@@ -214,31 +234,31 @@ export function findPer10Errors(text: string): { found: number; errors: string[]
  * 独立に求める（integerNote / per10cmResult の実装が壊れても検出できるように）。
  */
 export function findIntegerClaimErrors(claim: string, count: number, lengthCm: number): string[] {
-  const raw = per10cmFromCount(count, lengthCm);
-  if (raw === null) return [`${count}÷${lengthCm}: 換算できない入力`];
-  const rounded = Math.round(raw);
-  const divisible = Math.abs(raw - rounded) <= EPSILON;
+  const exact = exactPer10(String(count), String(lengthCm));
+  if (exact === null) return [`${count}÷${lengthCm}: 換算できない入力`];
+  const divisible = exact.isInteger;
+  const rounded = exact.integer;
   const errors: string[] = [];
   const text = claim.replace(/\s+/g, "");
   let claims = 0;
   const round = text.match(/四捨五入して(\d+)/);
   if (round) {
     claims += 1;
-    if (divisible) errors.push(`「四捨五入して」と書いているが ${raw} は整数`);
-    if (Number(round[1]) !== rounded) errors.push(`四捨五入した値は ${rounded}（本文は ${round[1]}）`);
+    if (divisible) errors.push(`「四捨五入して」と書いているが ${count}÷${lengthCm}×10 は整数`);
+    if (round[1] !== rounded) errors.push(`四捨五入した値は ${rounded}（本文は ${round[1]}）`);
   }
   const asIs = text.match(/そのまま使えます（(\d+)[目段]）/);
   if (asIs) {
     claims += 1;
-    if (!divisible) errors.push(`「そのまま使えます」と書いているが ${raw} は整数でない`);
-    if (Number(asIs[1]) !== rounded) errors.push(`整数の値は ${rounded}（本文は ${asIs[1]}）`);
+    if (!divisible) errors.push(`「そのまま使えます」と書いているが ${count}÷${lengthCm}×10 は整数でない`);
+    if (asIs[1] !== rounded) errors.push(`整数の値は ${rounded}（本文は ${asIs[1]}）`);
   }
   if (/割り切れない/.test(text)) {
     claims += 1;
-    if (divisible) errors.push(`「割り切れない」と書いているが ${raw} は整数`);
+    if (divisible) errors.push(`「割り切れない」と書いているが ${count}÷${lengthCm}×10 は整数`);
   } else if (/割り切れる/.test(text)) {
     claims += 1;
-    if (!divisible) errors.push(`「割り切れる」と書いているが ${raw} は整数でない`);
+    if (!divisible) errors.push(`「割り切れる」と書いているが ${count}÷${lengthCm}×10 は整数でない`);
   }
   if (claims === 0) errors.push("整数についての言及が見つからない");
   return errors;

@@ -7,13 +7,15 @@ import {
   countForLength,
   lengthForCount,
   rawCountForLength,
+  roundToTenths,
 } from "./grading.ts";
 
 /** 浮動小数の誤差（4.8×22＝105.60000000000001 等）を同じ値とみなす幅。 */
 const EPSILON = 1e-9;
 
+/** 小数第 1 位へ四捨五入（厳密。1.15 → 1.2、6.25 → 6.3）。grading.ts の整数演算を通す。 */
 function round1(value: number): number {
-  return Math.round(value * 10) / 10;
+  return roundToTenths(value);
 }
 
 /** 表示用に小数第1位までへ丸めた文字列（整数ならそのまま整数）。 */
