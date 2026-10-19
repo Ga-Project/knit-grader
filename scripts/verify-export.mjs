@@ -29,7 +29,15 @@ import { SITE_URL, OG_IMAGE_URL, GOATCOUNTER_CODE } from "../app/config.ts";
 import { countForLength } from "../lib/grading.ts";
 import { findEquationErrors, finishedCm } from "../lib/calc-text.ts";
 import { GAUGE_GUIDE_PATH } from "../lib/gauge-guide.ts";
-import { per10cmParts, per10cmResult, per10cmText, findPer10Errors, SWATCH_GUIDE_PATH } from "../lib/swatch-guide.ts";
+import {
+  findFaqIntegerErrors,
+  findIntegerClaimErrors,
+  findPer10Errors,
+  per10cmParts,
+  per10cmResult,
+  per10cmText,
+  SWATCH_GUIDE_PATH,
+} from "../lib/swatch-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -390,7 +398,8 @@ function checkFaqAndCrumbs(rel, html, text, { pageUrl, min, max }) {
 
 function checkGaugePage(rel, html) {
   const text = visibleText(html);
-  checkFaqAndCrumbs(rel, html, text, { pageUrl: GAUGE_URL, min: 3, max: 5 });
+  const blocks = checkFaqAndCrumbs(rel, html, text, { pageUrl: GAUGE_URL, min: 3, max: 5 });
+  checkNoPaidTerms(rel, html, text, blocks);
 
   // 本文中の計算式（「＝」「≈」「四捨五入して」の主張）が計算結果と一致するか
   const eq = findEquationErrors(text);
@@ -516,6 +525,14 @@ function hasClass(attrs, name) {
 function checkSwatchPage(rel, html) {
   const text = visibleText(html);
   const blocks = checkFaqAndCrumbs(rel, html, text, { pageUrl: SWATCH_URL, min: 3, max: 4 });
+  const faqLd = blocks.find((b) => b["@type"] === "FAQPage");
+  const convertAnswers = (faqLd?.mainEntity ?? [])
+    .map((q) => q.acceptedAnswer?.text ?? "")
+    .filter((a) => /cmで[\d.]+[目段]なら/.test(a));
+  if (convertAnswers.length === 0) fail(`${rel}: 換算の例を含む FAQ の回答が無い`);
+  for (const a of convertAnswers) {
+    for (const e of findFaqIntegerErrors(a)) fail(`${rel}: FAQ の整数の案内: ${e}`);
+  }
   const eq = findPer10Errors(text);
   if (eq.found < 2) fail(`${rel}: 本文の換算式が ${eq.found} 件しか見つからない`);
   for (const e of eq.errors) fail(`${rel}: 換算式の食い違い ${e}`);
@@ -541,6 +558,11 @@ function checkSwatchPage(rel, html) {
     const parts = per10cmParts(r);
     if (!line.startsWith(`${count}÷${len}×10${parts.relation}`)) {
       fail(`${rel}: 実例の式「${line}」が「${count}÷${len}×10${parts.relation}…」で始まらない（＝/≈ または入力の取り違え）`);
+    }
+    // 整数にしたときの案内（四捨五入した値・割り切れるかどうか）が、換算結果と独立に求めた値と一致するか
+    const note = textOf(row.match(/<p class="swatch-ex__note">(.*?)<\/p>/s)?.[1] ?? "");
+    for (const e of findIntegerClaimErrors(note, Number(count), Number(len))) {
+      fail(`${rel}: 実例の整数の案内「${note}」: ${e}`);
     }
     const label = textOf(row.match(/<p class="swatch-ex__label">(.*?)<\/p>/s)?.[1] ?? "");
     const lm = label.match(/（([\d.]+)cmで([\d.]+)([目段])）/);
@@ -569,9 +591,11 @@ function checkTopPage(rel, html) {
     fail(`${rel}: GoatCounter のカウント先（${GOATCOUNTER_CODE}）が無い`);
   }
   if (!html.includes("//gc.zgo.at/count.js")) fail(`${rel}: GoatCounter のスクリプトが無い`);
-  if (!jsonLdBlocks(rel, html).some((b) => b["@type"] === "SoftwareApplication")) {
+  const topBlocks = jsonLdBlocks(rel, html);
+  if (!topBlocks.some((b) => b["@type"] === "SoftwareApplication")) {
     fail(`${rel}: SoftwareApplication JSON-LD が無い`);
   }
+  checkNoPaidTerms(rel, html, visibleText(html), topBlocks);
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) {
     fail(`${rel}: /gauge/ への導線（href="${BASE_PATH}${GAUGE_GUIDE_PATH}"）が無い`);
   }
