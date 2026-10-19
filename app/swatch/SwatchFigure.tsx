@@ -31,14 +31,14 @@ function vDim(y1: number, y2: number, x: number): string {
 }
 
 function Knit() {
-  // 余白つきの大きめスワッチ（7×8 目）と、その中央の 10cm 枠（横4目×縦4段ぶん）
+  // 余白つきの大きめスワッチ（8 目 × 8 段）と、その中央の 10cm 枠（4 目 × 4 段ぶん）
   return (
     <>
       <rect x="8" y="8" width="164" height="124" className="fig-cloth" />
       <path d={vGrid(8, 8, 8, 8, 20.5, 15.5)} className="fig-v fig-v--faint" />
       <rect x="49" y="39" width="82" height="62" className="fig-frame" />
       <path d={vGrid(49, 39, 4, 4, 20.5, 15.5)} className="fig-v" />
-      <text x="90" y="30" className="fig-text" textAnchor="middle">中央に10cm枠</text>
+      <text x="90" y="27" className="fig-text" textAnchor="middle">中央に10cm枠</text>
       <text x="28" y="76" className="fig-text" textAnchor="middle">余白</text>
       <text x="152" y="76" className="fig-text" textAnchor="middle">余白</text>
     </>
@@ -46,17 +46,17 @@ function Knit() {
 }
 
 function Wash() {
-  // 洗う前（破線）と洗った後（実線）。幅は縮み、丈は伸びた例を重ねて「どちらもありうる」ことを示す
+  // 洗う前（左・破線）と洗った後（右・実線）を並べる。右は幅が縮み丈が伸びた例で、縮むことも伸びることもあると示す
   return (
     <>
-      <rect x="55" y="22" width="70" height="70" className="fig-ghost" />
-      <rect x="62" y="14" width="56" height="86" className="fig-cloth" />
-      <path d={vGrid(62, 14, 4, 5, 14, 17.2)} className="fig-v" />
-      <path d="M12 120H34" className="fig-ghost-line" />
-      <text x="40" y="124" className="fig-text">洗う前</text>
-      <path d="M96 120H118" className="fig-solid-line" />
-      <text x="124" y="124" className="fig-text">洗った後</text>
-      <text x="90" y="138" className="fig-text" textAnchor="middle">縮むことも伸びることも</text>
+      <rect x="14" y="26" width="60" height="60" className="fig-ghost" />
+      <path d={vGrid(14, 26, 4, 4, 15, 15)} className="fig-v fig-v--faint" />
+      <text x="44" y="108" className="fig-text" textAnchor="middle">洗う前</text>
+      <path d="M82 56H98M92 49L98 56L92 63" className="fig-arrow" />
+      <rect x="108" y="18" width="48" height="76" className="fig-cloth" />
+      <path d={vGrid(108, 18, 4, 5, 12, 15.2)} className="fig-v" />
+      <text x="132" y="108" className="fig-text" textAnchor="middle">洗った後</text>
+      <text x="90" y="134" className="fig-text" textAnchor="middle">縮むことも伸びることも</text>
     </>
   );
 }
@@ -71,8 +71,8 @@ function Count() {
       <path d={vGrid(30, 49.3, 5, 4, 20, 15.3)} className="fig-v" />
       <path d={hDim(30, 130, 24)} className="fig-dim" />
       <text x="80" y="14" className="fig-text" textAnchor="middle">目数（横）</text>
-      <path d={vDim(49.3, 110.5, 156)} className="fig-dim" />
-      <text x="0" y="0" className="fig-text" textAnchor="middle" transform="translate(171 80) rotate(90)">段数（縦）</text>
+      <path d={vDim(49.3, 110.5, 152)} className="fig-dim" />
+      <text x="0" y="0" className="fig-text" textAnchor="middle" transform="translate(166 80) rotate(90)">段数（縦）</text>
     </>
   );
 }

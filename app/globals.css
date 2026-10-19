@@ -731,6 +731,7 @@ hr {
 .brand {
   display: inline-flex;
   align-items: center;
+  min-height: 44px; /* タッチターゲット 44px */
   gap: var(--sp-2);
   font-weight: var(--fw-bold);
   font-size: var(--fs-md);
@@ -858,6 +859,9 @@ hr {
 
 .skip-link {
   position: absolute;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* タッチターゲット 44px */
   left: var(--sp-4);
   top: -4rem;
   background: var(--accent);

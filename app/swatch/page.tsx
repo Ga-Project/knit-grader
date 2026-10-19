@@ -103,7 +103,7 @@ export default function SwatchGuide() {
 
       <main id="main" tabIndex={-1} style={{ outline: "none" }}>
         <section className="hero-band">
-          <div className="container swatch-hero">
+          <div className="container container-narrow swatch-hero">
             <div className="swatch-hero__text">
             <nav className="breadcrumb" aria-label="パンくずリスト">
               <ol>
@@ -118,9 +118,12 @@ export default function SwatchGuide() {
             <p className="hero-lead">
               {"ゲージは、"}
               <span className="nowrap">試し編み（スワッチ）</span>
-              {
-                "の10cm四方に入る目数と段数です。編んで、洗って乾かして、中央で数え、10cmあたりに換算する。この4つの手順で測れます。"
-              }
+              {"の10cm四方に入る目数と段数です。"}
+              <span className="nowrap">編んで、</span>
+              <span className="nowrap">洗って乾かして、</span>
+              <span className="nowrap">中央で数え、</span>
+              <span className="nowrap">10cmあたりに換算する。</span>
+              {"この4つの手順で測れます。"}
             </p>
             <div className="hero-actions">
               <a className="btn btn-primary" href="#calc">
@@ -169,7 +172,7 @@ export default function SwatchGuide() {
             </h2>
             <p>
               {
-                "数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、割り切れないときは「約」を付けます。"
+                "数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、小数第1位で表しきれないときは「約」を付けます。整数のゲージとして使うときは四捨五入した値も示します。"
               }
             </p>
             <SwatchCalc />

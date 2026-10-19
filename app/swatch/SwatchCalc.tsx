@@ -1,15 +1,17 @@
 "use client";
 
 // 試し編みで数えた目数（段数）と測った長さから、10cm あたりに換算する小さな計算部品。
-// 入力は保存しない（ストレージなし）。換算の実体は lib/grading.ts の per10cmFromCount。
+// 入力は保存しない（ストレージなし）。換算の実体は lib/grading.ts の per10cmFromCount、
+// 表示する状態の分岐は lib/swatch-guide.ts の swatchRowState（単体テスト済み）。
+// 結果欄は高さを固定し、空・エラー・結果のどれでも下の要素が動かない。
 import { useState } from "react";
 import Link from "next/link";
-import { MAX_MEASURE, MEASURE_ERROR, MIN_MEASURE, parseMeasure } from "@/lib/grading";
+import { MAX_MEASURE, MEASURE_ERROR, MIN_MEASURE } from "@/lib/grading";
 import {
   integerNote,
   per10cmParts,
-  per10cmResult,
   per10cmText,
+  swatchRowState,
 } from "@/lib/swatch-guide";
 
 interface RowProps {
@@ -33,15 +35,11 @@ function ConvertRow({
 }: RowProps) {
   const [count, setCount] = useState("");
   const [length, setLength] = useState("");
-  const c = parseMeasure(count);
-  const l = parseMeasure(length);
-  const countBad = count.trim() !== "" && c === null;
-  const lengthBad = length.trim() !== "" && l === null;
-  const result = c !== null && l !== null ? per10cmResult(c, l) : null;
-  // 両方の入力は有効だが、換算結果がゲージとして使える範囲に収まらない
-  const outOfRange = c !== null && l !== null && result === null;
+  const state = swatchRowState(count, length);
+  const countBad = state.kind === "invalid" && state.countBad;
+  const lengthBad = state.kind === "invalid" && state.lengthBad;
+  const hasError = state.kind === "invalid" || state.kind === "outOfRange";
   const errId = `${id}-error`;
-  const parts = result ? per10cmParts(result) : null;
 
   return (
     <div className="swatch-calc__row">
@@ -54,6 +52,7 @@ function ConvertRow({
               id={`${id}-count`}
               type="text"
               inputMode="decimal"
+              autoComplete="off"
               placeholder={countPlaceholder}
               value={count}
               onChange={(e) => setCount(e.target.value)}
@@ -70,6 +69,7 @@ function ConvertRow({
               id={`${id}-length`}
               type="text"
               inputMode="decimal"
+              autoComplete="off"
               placeholder={lengthPlaceholder}
               value={length}
               onChange={(e) => setLength(e.target.value)}
@@ -80,36 +80,37 @@ function ConvertRow({
           </div>
         </div>
       </div>
-      {(countBad || lengthBad) && (
-        <p className="field-error" id={errId}>
-          <span aria-hidden="true">⚠ </span>
-          {MEASURE_ERROR}
-        </p>
-      )}
-      {outOfRange && (
-        <p className="field-error" id={errId}>
-          <span aria-hidden="true">⚠ </span>
-          {`換算結果が${MIN_MEASURE}〜${MAX_MEASURE}の範囲に収まりません。数えた数と測った長さを見直してください`}
-        </p>
-      )}
       <div
-        className={`swatch-calc__out ${result ? "" : "is-empty"}`}
+        className={`swatch-calc__out ${state.kind === "ok" ? "" : hasError ? "is-error" : "is-empty"}`}
         role="status"
         aria-live="polite"
         data-testid={`${id}-result`}
       >
-        {result && parts ? (
+        {state.kind === "ok" ? (
           <>
             <p className="swatch-calc__num tabular">
               <span className="swatch-calc__label">10cmあたり</span>
-              <b>{per10cmText(result)}</b>
+              <b>{per10cmText(state.result)}</b>
               {unit}
             </p>
             <p className="swatch-calc__calc tabular">
-              {`${parts.expression} ${parts.relation} ${parts.value}`}
+              {(() => {
+                const p = per10cmParts(state.result);
+                return `${p.expression} ${p.relation} ${p.value}`;
+              })()}
             </p>
-            <p className="swatch-calc__note">{integerNote(result, unit)}</p>
+            <p className="swatch-calc__note">{integerNote(state.result, unit)}</p>
           </>
+        ) : state.kind === "invalid" ? (
+          <p className="field-error swatch-calc__error" id={errId}>
+            <span aria-hidden="true">⚠ </span>
+            {MEASURE_ERROR}
+          </p>
+        ) : state.kind === "outOfRange" ? (
+          <p className="field-error swatch-calc__error" id={errId}>
+            <span aria-hidden="true">⚠ </span>
+            {`換算結果が${MIN_MEASURE}〜${MAX_MEASURE}の範囲に収まりません。数えた数と測った長さを見直してください`}
+          </p>
         ) : (
           <p className="swatch-calc__hint">
             {countLabel}と測った長さを入れると、10cmあたりに換算します。

@@ -835,12 +835,12 @@
 /* hero: 左に見出し、右に完成した 10cm 角のスワッチ図。狭い画面では縦積み */
 .swatch-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
-  gap: var(--sp-8);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 13rem);
+  gap: var(--sp-6);
   align-items: center;
 }
 .swatch-hero__fig {
-  max-width: 20rem;
+  max-width: 13rem;
 }
 @media (max-width: 760px) {
   .swatch-hero {
@@ -852,9 +852,14 @@
   }
 }
 
-/* 見出しは語の途中で折り返さない（対応ブラウザでは文節で、他は nowrap の区切りで折る） */
+/* 和文は語の途中で折り返さない（対応ブラウザでは文節で折る。未対応ブラウザは nowrap で区切った箇所で折る）。
+   見出し・リード・本文・FAQ の質問と回答すべてに掛ける（全ページ共通）。 */
 .section-plan__text h3,
-.guide-section h2 {
+.guide-section h2,
+.hero-lead,
+.guide-section p,
+.faq__item summary,
+.faq__body {
   word-break: auto-phrase;
 }
 
@@ -879,12 +884,18 @@
   font-size: var(--fs-base);
 }
 .swatch-calc__out {
-  min-height: 5.5rem;
+  min-height: 6.5rem;
   border-left: 3px solid var(--accent);
   padding-left: var(--sp-4);
 }
 .swatch-calc__out.is-empty {
   border-left-color: var(--table-rule);
+}
+.swatch-calc__out.is-error {
+  border-left-color: var(--err);
+}
+.swatch-calc__error {
+  margin: 0;
 }
 .swatch-calc__num {
   margin: 0;
