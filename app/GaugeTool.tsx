@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { parseMeasure, computeCounts } from "@/lib/grading";
+import {
+  parseMeasure,
+  computeCounts,
+  countsUsable,
+  MEASURE_ERROR,
+} from "@/lib/grading";
 import { STORAGE_KEY } from "./config";
 import { StitchMark } from "./StitchMark";
 
@@ -82,20 +87,23 @@ export function GaugeTool() {
     [gSt, gRow],
   );
 
-  const custom = useMemo(
+  const computed = useMemo(
     () =>
       gauge && w !== null && l !== null ? computeCounts(gauge, w, l) : null,
     [gauge, w, l],
   );
+  // 四捨五入で 0 目・0 段になる組み合わせは結果として出さず、案内を出す。
+  const tooSmall = computed !== null && !countsUsable(computed);
+  const custom = computed !== null && !tooSmall ? computed : null;
 
   // 編み地矩形の表示px（幅:丈 の物理比を保って収める）。
   // ゲージも揃って初めて描く（結果数値・タグと足並みを揃え、寸法だけの宙ぶらりんな矩形を出さない）。
   const swatch = useMemo(() => {
-    if (gauge === null || w === null || l === null) return null;
+    if (gauge === null || w === null || l === null || custom === null) return null;
     const max = 200;
     const scale = max / Math.max(w, l);
     return { w: Math.max(24, w * scale), h: Math.max(24, l * scale) };
-  }, [gauge, w, l]);
+  }, [gauge, w, l, custom]);
 
   const fieldError = (raw: string, value: number | null) =>
     raw.trim() !== "" && value === null;
@@ -149,10 +157,8 @@ export function GaugeTool() {
                   <div className="suffix-input">
                     <input
                       id="g-st"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      min="1"
-                      step="0.1"
                       placeholder="20"
                       value={gaugeSt}
                       onChange={(e) => {
@@ -172,10 +178,8 @@ export function GaugeTool() {
                   <div className="suffix-input">
                     <input
                       id="g-row"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      min="1"
-                      step="0.1"
                       placeholder="28"
                       value={gaugeRow}
                       onChange={(e) => {
@@ -194,7 +198,7 @@ export function GaugeTool() {
               {(fieldError(gaugeSt, gSt) || fieldError(gaugeRow, gRow)) && (
                 <p className="field-error" id="gauge-error">
                   <span aria-hidden="true">⚠ </span>
-                  1以上の数値を入力してください
+                  {MEASURE_ERROR}
                 </p>
               )}
             </div>
@@ -210,10 +214,8 @@ export function GaugeTool() {
                   <div className="suffix-input">
                     <input
                       id="w"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      min="1"
-                      step="0.1"
                       placeholder="48"
                       value={width}
                       onChange={(e) => {
@@ -221,7 +223,9 @@ export function GaugeTool() {
                         setWidth(e.target.value);
                       }}
                       aria-invalid={fieldError(width, w)}
-                      aria-describedby="dims-hint"
+                      aria-describedby={
+                        fieldError(width, w) ? "dims-error" : "dims-hint"
+                      }
                     />
                     <span className="suffix">cm</span>
                   </div>
@@ -231,10 +235,8 @@ export function GaugeTool() {
                   <div className="suffix-input">
                     <input
                       id="l"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      min="1"
-                      step="0.1"
                       placeholder="56"
                       value={length}
                       onChange={(e) => {
@@ -242,12 +244,26 @@ export function GaugeTool() {
                         setLength(e.target.value);
                       }}
                       aria-invalid={fieldError(length, l)}
-                      aria-describedby="dims-hint"
+                      aria-describedby={
+                        fieldError(length, l) ? "dims-error" : "dims-hint"
+                      }
                     />
                     <span className="suffix">cm</span>
                   </div>
                 </div>
               </div>
+              {(fieldError(width, w) || fieldError(length, l)) && (
+                <p className="field-error" id="dims-error">
+                  <span aria-hidden="true">⚠ </span>
+                  {MEASURE_ERROR}
+                </p>
+              )}
+              {tooSmall && (
+                <p className="field-error" id="small-error" role="alert">
+                  <span aria-hidden="true">⚠ </span>
+                  この組み合わせでは目数か段数が1未満になります。ゲージか寸法を見直してください
+                </p>
+              )}
               <p className="field-hint" id="dims-hint">
                 計算後もいつでも修正できます。入力は自動で保存され、消えません。
               </p>

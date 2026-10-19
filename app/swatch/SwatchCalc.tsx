@@ -4,7 +4,7 @@
 // 入力は保存しない（ストレージなし）。換算の実体は lib/grading.ts の per10cmFromCount。
 import { useState } from "react";
 import Link from "next/link";
-import { parseMeasure } from "@/lib/grading";
+import { MAX_MEASURE, MEASURE_ERROR, MIN_MEASURE, parseMeasure } from "@/lib/grading";
 import {
   integerNote,
   per10cmParts,
@@ -38,7 +38,10 @@ function ConvertRow({
   const countBad = count.trim() !== "" && c === null;
   const lengthBad = length.trim() !== "" && l === null;
   const result = c !== null && l !== null ? per10cmResult(c, l) : null;
+  // 両方の入力は有効だが、換算結果がゲージとして使える範囲に収まらない
+  const outOfRange = c !== null && l !== null && result === null;
   const errId = `${id}-error`;
+  const parts = result ? per10cmParts(result) : null;
 
   return (
     <div className="swatch-calc__row">
@@ -49,15 +52,13 @@ function ConvertRow({
           <div className="suffix-input">
             <input
               id={`${id}-count`}
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="1"
-              step="any"
               placeholder={countPlaceholder}
               value={count}
               onChange={(e) => setCount(e.target.value)}
               aria-invalid={countBad}
-              aria-describedby={countBad || lengthBad ? errId : undefined}
+              aria-describedby={countBad ? errId : undefined}
             />
             <span className="suffix">{unit}</span>
           </div>
@@ -67,15 +68,13 @@ function ConvertRow({
           <div className="suffix-input">
             <input
               id={`${id}-length`}
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="1"
-              step="any"
               placeholder={lengthPlaceholder}
               value={length}
               onChange={(e) => setLength(e.target.value)}
               aria-invalid={lengthBad}
-              aria-describedby={countBad || lengthBad ? errId : undefined}
+              aria-describedby={lengthBad ? errId : undefined}
             />
             <span className="suffix">cm</span>
           </div>
@@ -84,7 +83,13 @@ function ConvertRow({
       {(countBad || lengthBad) && (
         <p className="field-error" id={errId}>
           <span aria-hidden="true">⚠ </span>
-          1以上の数値を入力してください
+          {MEASURE_ERROR}
+        </p>
+      )}
+      {outOfRange && (
+        <p className="field-error" id={errId}>
+          <span aria-hidden="true">⚠ </span>
+          {`換算結果が${MIN_MEASURE}〜${MAX_MEASURE}の範囲に収まりません。数えた数と測った長さを見直してください`}
         </p>
       )}
       <div
@@ -93,7 +98,7 @@ function ConvertRow({
         aria-live="polite"
         data-testid={`${id}-result`}
       >
-        {result ? (
+        {result && parts ? (
           <>
             <p className="swatch-calc__num tabular">
               <span className="swatch-calc__label">10cmあたり</span>
@@ -101,7 +106,7 @@ function ConvertRow({
               {unit}
             </p>
             <p className="swatch-calc__calc tabular">
-              {`${per10cmParts(result).expression} ${per10cmParts(result).relation} ${per10cmParts(result).value}`}
+              {`${parts.expression} ${parts.relation} ${parts.value}`}
             </p>
             <p className="swatch-calc__note">{integerNote(result, unit)}</p>
           </>

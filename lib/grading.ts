@@ -18,17 +18,33 @@ export interface Gauge {
   rows: number;
 }
 
+/** ゲージ・寸法として受け付ける下限と上限。上限は 1e308 のような値で計算結果が Infinity や 1e+22 表記になるのを防ぐ現実的な幅。 */
+export const MIN_MEASURE = 1;
+export const MAX_MEASURE = 1000;
+
+/** 入力欄のエラー文言（UI はこの定数を使い、文言と受理範囲を一致させる）。 */
+export const MEASURE_ERROR = `${MIN_MEASURE}以上${MAX_MEASURE}以下の数値を入力してください`;
+
+/** 受理する書式: 半角数字と小数点のみ（符号・指数・16進・全角・桁区切りは不可）。「20.」のような入力途中も許す。 */
+const MEASURE_PATTERN = /^\d+(?:\.\d*)?$/;
+
 /**
  * 入力文字列をゲージ／寸法の値として解釈する。
- * この道具のゲージ(目数・段数)も寸法(cm)も 1 未満は意味を成さないため、
- * 空・非数・1 未満は無効として null を返す（UI の min=1・エラー文言「1以上」と一致させる）。
+ * この道具のゲージ(目数・段数)も寸法(cm)も MIN_MEASURE(1) 未満は意味を成さず、
+ * MAX_MEASURE(1000) 超は計算結果が桁あふれするため、空・非数・範囲外は無効として null を返す
+ * （UI のエラー文言 MEASURE_ERROR と一致させる）。
  */
 export function parseMeasure(input: string): number | null {
   const trimmed = input.trim();
-  if (trimmed === "") return null;
+  if (!MEASURE_PATTERN.test(trimmed)) return null;
   const value = Number(trimmed);
-  if (!Number.isFinite(value) || value < 1) return null;
+  if (!Number.isFinite(value) || value < MIN_MEASURE || value > MAX_MEASURE) return null;
   return value;
+}
+
+/** 値が MIN_MEASURE 以上 MAX_MEASURE 以下の有限数か。 */
+export function isMeasure(value: number): boolean {
+  return Number.isFinite(value) && value >= MIN_MEASURE && value <= MAX_MEASURE;
 }
 
 /**
@@ -67,16 +83,25 @@ export function computeCounts(
 /**
  * 試し編みで数えた目数(または段数)と、その測った長さ(cm)から、10cm あたりの値を求める。
  * countForLength / lengthForCount の逆向きの換算。parseMeasure と同じ規則で、
- * 数えた数・長さのどちらかが 1 以上の有限数でなければ null を返す。
+ * 数えた数・長さが MIN〜MAX_MEASURE の範囲外、または換算結果がその範囲外なら null を返す。
  * 割り算の誤差を減らすため (count × 10) ÷ length の順で計算する。丸めはしない（表示は calc-text.ts）。
  */
 export function per10cmFromCount(count: number, lengthCm: number): number | null {
-  if (!Number.isFinite(count) || !Number.isFinite(lengthCm)) return null;
-  if (count < 1 || lengthCm < 1) return null;
-  return (count * 10) / lengthCm;
+  if (!isMeasure(count) || !isMeasure(lengthCm)) return null;
+  const per10cm = (count * 10) / lengthCm;
+  // 結果もゲージとして受け付けられる範囲（MIN〜MAX）に収まること。収まらない換算は無効（0・桁あふれを出さない）。
+  return isMeasure(per10cm) ? per10cm : null;
 }
 
 /** 10cm あたりの値を整数のゲージとして使うときの丸め（四捨五入）。 */
 export function toIntegerGauge(per10cm: number): number {
   return Math.round(per10cm);
+}
+
+/**
+ * 計算した目数・段数が 1 以上か。寸法が小さくゲージも粗いと四捨五入で 0 になる
+ * （例 ゲージ1・寸法1cm → 0.1 → 0）。0 目・0 段は編めないので UI は結果を出さずに案内する。
+ */
+export function countsUsable(counts: { stitches: number; rows: number }): boolean {
+  return counts.stitches >= 1 && counts.rows >= 1;
 }

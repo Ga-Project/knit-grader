@@ -2,7 +2,19 @@
 // 期待値は例の入力値を書き写さず、生成物のフィールドから計算し直して突き合わせる。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMeasure, per10cmFromCount, toIntegerGauge, lengthForCount } from "../lib/grading.ts";
+import {
+  MAX_MEASURE,
+  MIN_MEASURE,
+  MEASURE_ERROR,
+  computeCounts,
+  countForLength,
+  countsUsable,
+  isMeasure,
+  parseMeasure,
+  per10cmFromCount,
+  toIntegerGauge,
+  lengthForCount,
+} from "../lib/grading.ts";
 import {
   SWATCH_GUIDE_PATH,
   buildSwatchExample,
@@ -121,6 +133,83 @@ test("findPer10Errors: 偽の等式を検出する", () => {
   assert.equal(findPer10Errors("25÷12×10≈21.8").errors.length, 1);
   assert.equal(findPer10Errors("0÷12×10＝0").errors.length, 1);
   assert.equal(findPer10Errors("式なし").found, 0);
+});
+
+test("findPer10Errors: ≈ の許容幅は表示桁の半分（20.833… に対し ≈20.8 は正、≈20.9 は不正、整数 ≈21 は許容）", () => {
+  // 許容幅を 0.5 → 1 に緩める変異（lib/swatch-guide.ts の HALF）で、下の不正ケースが落ちる
+  assert.deepEqual(findPer10Errors("25÷12×10≈20.8").errors, []);
+  assert.equal(findPer10Errors("25÷12×10≈20.9").errors.length, 1);
+  assert.equal(findPer10Errors("25÷12×10≈20.7").errors.length, 1);
+  assert.deepEqual(findPer10Errors("25÷12×10≈21").errors, []);
+  assert.equal(findPer10Errors("25÷12×10≈22").errors.length, 1);
+  assert.equal(findPer10Errors("25÷12×10≈20").errors.length, 1);
+  // 2 桁表示: 20.83 は正、20.84 は不正
+  assert.deepEqual(findPer10Errors("25÷12×10≈20.83").errors, []);
+  assert.equal(findPer10Errors("25÷12×10≈20.85").errors.length, 1);
+});
+
+test("findPer10Errors: 「約」付きの近似行（≈ 約20.8）も検査する", () => {
+  assert.deepEqual(findPer10Errors("25 ÷ 12 × 10 ≈ 約20.8"), { found: 1, errors: [] });
+  assert.equal(findPer10Errors("25 ÷ 12 × 10 ≈ 約20.9").errors.length, 1);
+  // ＝ に「約」は付けない / 割り切れる式を ≈ と書かない
+  assert.equal(findPer10Errors("36 ÷ 12 × 10 ＝ 約30").errors.length, 1);
+  assert.equal(findPer10Errors("36 ÷ 12 × 10 ≈ 約30").errors.length, 1);
+  // 割り切れない式を ＝ と書かない
+  assert.equal(findPer10Errors("25 ÷ 12 × 10 ＝ 約20.8").errors.length, 2);
+});
+
+test("入力の範囲: 受理するのは半角数字の MIN〜MAX_MEASURE だけ（桁あふれ・指数・16進・全角は無効）", () => {
+  assert.equal(parseMeasure(String(MAX_MEASURE)), MAX_MEASURE);
+  assert.equal(parseMeasure(String(MAX_MEASURE + 0.1)), null);
+  assert.equal(parseMeasure(String(MIN_MEASURE)), MIN_MEASURE);
+  for (const bad of ["1e308", "1e3", "0x10", "1,5", "１２", "+5", "--5", "5cm", "1e999", "99999999999999999999"]) {
+    assert.equal(parseMeasure(bad), null, bad);
+  }
+  assert.equal(parseMeasure("12."), 12);
+  assert.ok(MEASURE_ERROR.includes(String(MAX_MEASURE)) && MEASURE_ERROR.includes(String(MIN_MEASURE)));
+  assert.equal(isMeasure(Infinity), false);
+  assert.equal(isMeasure(NaN), false);
+});
+
+test("per10cmFromCount: 結果が範囲外（0 に近い・桁あふれ）なら null。Infinity・0・1e+ 表記を出さない", () => {
+  assert.equal(per10cmFromCount(1e308, 1), null);
+  assert.equal(per10cmFromCount(1, 1e300), null);
+  assert.equal(per10cmFromCount(1, MAX_MEASURE), null); // 0.01 → ゲージ 1 未満
+  assert.equal(per10cmFromCount(MAX_MEASURE, 1), null); // 10000 → 上限超え
+  assert.equal(per10cmFromCount(MAX_MEASURE, 10), MAX_MEASURE);
+  assert.equal(per10cmFromCount(MIN_MEASURE, 10), MIN_MEASURE);
+  // 受理した結果は常に有限で、表示に指数表記や 0 が出ない
+  for (const c of [1, 7, 25, 36, 500, 1000]) {
+    for (const l of [1, 3.5, 12, 100, 1000]) {
+      const r = per10cmResult(c, l);
+      if (r === null) continue;
+      assert.ok(Number.isFinite(r.raw) && r.raw >= MIN_MEASURE && r.raw <= MAX_MEASURE);
+      assert.ok(!/e[+-]|Infinity|NaN/i.test(r.display) && Number(r.display) >= 1);
+    }
+  }
+});
+
+test("既存の計算も、受理した入力の範囲では有限で桁あふれしない。小さすぎる結果は countsUsable で弾く", () => {
+  const big = computeCounts({ stitches: MAX_MEASURE, rows: MAX_MEASURE }, MAX_MEASURE, MAX_MEASURE);
+  assert.deepEqual(big, { stitches: 100000, rows: 100000 });
+  assert.ok(Number.isFinite(lengthForCount(MIN_MEASURE, MAX_MEASURE)));
+  assert.equal(countForLength(1, 1), 0); // 0.1 → 0 目
+  assert.equal(countsUsable(computeCounts({ stitches: 1, rows: 1 }, 1, 1)), false);
+  assert.equal(countsUsable(computeCounts({ stitches: 20, rows: 28 }, 48, 56)), true);
+  assert.equal(countsUsable({ stitches: 5, rows: 0 }), false);
+});
+
+test("per10cmResult: 数えた数と長さの引数を取り違えると別の結果になり、フィールドは渡した順に保持される", () => {
+  const a = per10cmResult(25, 12);
+  const b = per10cmResult(12, 25);
+  assert.equal(a.count, 25);
+  assert.equal(a.lengthCm, 12);
+  assert.equal(b.count, 12);
+  assert.equal(b.lengthCm, 25);
+  assert.notEqual(a.display, b.display);
+  const ex = buildSwatchExample();
+  assert.equal(ex.stitches.raw, (ex.stitches.count * 10) / ex.stitches.lengthCm);
+  assert.equal(ex.rows.raw, (ex.rows.count * 10) / ex.rows.lengthCm);
 });
 
 test("JSON-LD: FAQ とパンくずがページに対応する", () => {
