@@ -135,12 +135,20 @@ export default function GaugeGuide() {
             <nav className="breadcrumb" aria-label="パンくずリスト">
               <ol>
                 <li>
-                  <Link href="/">ニットゲージ計算</Link>
+                  <Link href="/">
+                    <Words text="ニットゲージ計算" />
+                  </Link>
                 </li>
-                <li aria-current="page">{PAGE_NAME}</li>
+                <li aria-current="page">
+                  <span>
+                    <Words text={PAGE_NAME} />
+                  </span>
+                </li>
               </ol>
             </nav>
-            <span className="eyebrow">ゲージの使い方</span>
+            <span className="eyebrow">
+              <Words text="ゲージの使い方" />
+            </span>
             <h1>
               <Phrased text={PAGE_NAME} />
             </h1>
@@ -149,7 +157,9 @@ export default function GaugeGuide() {
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">
-                計算ツールで目数・段数を出す
+                <span>
+                  <Words text="計算ツールで目数・段数を出す" />
+                </span>
               </Link>
             </div>
           </div>
@@ -228,7 +238,9 @@ export default function GaugeGuide() {
 
         <section className="guide-section" aria-labelledby="mismatch-heading">
           <div className="container container-narrow">
-            <span className="eyebrow">ゲージが合わないとき</span>
+            <span className="eyebrow">
+              <Words text="ゲージが合わないとき" />
+            </span>
             <h2 id="mismatch-heading"><Phrased text="自分のゲージが指定と違うとき" /></h2>
             <p>
               <Words text="編み図の目数・段数は、その編み図が指定するゲージで編んだときの数です。自分のゲージが指定と違うまま同じ目数・段数で編むと、仕上がり寸法が変わります。自分のゲージで目数・段数を出し直せば、ほぼ指定どおりの寸法に仕上がります。" />
@@ -236,10 +248,14 @@ export default function GaugeGuide() {
 
             <div className="table-wrap">
               <table className="data-table compare-table">
-                <caption>{`幅${m.widthCm}cm・丈${m.lengthCm}cmを編む場合の目数・段数`}</caption>
+                <caption>
+                  <Words text={`幅${m.widthCm}cm・丈${m.lengthCm}cmを編む場合の目数・段数`} />
+                </caption>
                 <thead>
                   <tr>
-                    <th scope="col">ゲージ</th>
+                    <th scope="col">
+                      <Words text="ゲージ" />
+                    </th>
                     <th scope="col">目数</th>
                     <th scope="col">段数</th>
                   </tr>

@@ -2,8 +2,10 @@
 
 import { Words } from "./Words";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MAX_INPUT_LENGTH } from "@/lib/grading";
 import { analyzeGaugeInputs, restoreSaved } from "@/lib/gauge-input";
 import { STORAGE_KEY } from "./config";
+import { BigIntNote } from "./BigIntNote";
 import { Phrased } from "./Phrased";
 import { StitchMark } from "./StitchMark";
 
@@ -113,10 +115,14 @@ export function GaugeTool() {
   return (
     <section className="workspace-section" aria-labelledby="tool-heading">
       <div className="container">
-        <span className="eyebrow">ゲージ計算</span>
+        <span className="eyebrow">
+          <Words text="ゲージ計算" />
+        </span>
         <h2 id="tool-heading" style={{ marginTop: "var(--sp-2)" }}>
           <Phrased text="ゲージと仕上がり寸法を入れる" />
         </h2>
+
+        <BigIntNote />
 
         {restored && (
           <div
@@ -146,7 +152,7 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
-                      maxLength={8}
+                      maxLength={MAX_INPUT_LENGTH}
                       placeholder="20"
                       value={gaugeSt}
                       onChange={(e) => {
@@ -169,7 +175,7 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
-                      maxLength={8}
+                      maxLength={MAX_INPUT_LENGTH}
                       placeholder="28"
                       value={gaugeRow}
                       onChange={(e) => {
@@ -207,7 +213,7 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
-                      maxLength={8}
+                      maxLength={MAX_INPUT_LENGTH}
                       placeholder="48"
                       value={width}
                       onChange={(e) => {
@@ -230,7 +236,7 @@ export function GaugeTool() {
                       type="text"
                       inputMode="decimal"
                       autoComplete="off"
-                      maxLength={8}
+                      maxLength={MAX_INPUT_LENGTH}
                       placeholder="56"
                       value={length}
                       onChange={(e) => {

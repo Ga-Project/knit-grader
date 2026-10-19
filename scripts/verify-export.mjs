@@ -554,9 +554,10 @@ function splitsInsideWord(x, y) {
   const b = [...y][0];
   if (a === undefined || b === undefined) return false;
   if (/\s/.test(a) || /\s/.test(b)) return false;
-  if (/[、。，．！？・：；]/.test(a)) return false;
+  if (/[、。，．！？：；]/.test(a)) return false;
   if (/[（「『【〔〈《(\[“‘]/.test(b)) return false;
   if (/[）」』】〕〉》)\]”’]/.test(a) && !HIRAGANA_RE.test(b)) return false;
+  if (!HIRAGANA_RE.test(a) && /^(?:について|において|として|による)/.test(y)) return false;
   if (HIRAGANA_RE.test(a)) {
     if (HIRAGANA_RE.test(b)) return true;
     return !/(?:^|[^\u3041-\u309f])(?:から|まで|より|[はがをにでのともへや])$/.test(x);
@@ -583,28 +584,193 @@ function checkPhraseBoundaries(rel, html) {
   return checked;
 }
 
+// ---------------------------------------------------------------------------
+// 全ページ全テキストの不変条件（核語・折り返さない塊・flex の子）
+// ---------------------------------------------------------------------------
+
+/** 折り返さない塊の class（nowrap / core / phrase のいずれかを持つ span）。 */
+const BLOCK_CLASSES = ["nowrap", "core", "phrase"];
+/** 内側にあっても区切り（改行）にならない要素。それ以外のタグの前後は別の文として区切る。 */
+const INLINE_TAGS = new Set(["span", "b", "a", "em", "strong", "small", "code", "abbr", "sup", "sub", "i", "mark"]);
+const VOID_TAGS = new Set(["br", "img", "input", "meta", "link", "hr", "path", "circle", "rect", "line", "source", "wbr"]);
+/** 塊（nowrap / core / phrase）の中身が核語を含むときの長さの上限。長文を nowrap で包んで「保護済み」に見せるのを防ぐ。 */
+const MAX_CORE_BLOCK_LENGTH = 40;
+
 /**
- * 核になる語（lib/core-words.ts）が、長文（<p> と FAQ の回答）の中で、すべて折り返さない塊
- * （<span class="nowrap core">、または文節の塊・nowrap の span）に入っていること。
- * 塊に入っていない出現が 1 つでもあれば失敗にする。塊の数も数え、0 件（機能が外れた）なら失敗にする。
+ * HTML の本文を、要素の木（class・子）と、可視テキスト（要素の境界は区切り文字）に平らにしたものへ変換する。
+ * 平らにしたテキストの各文字には、その文字を含む最も外側の塊（nowrap/core/phrase の span）の番号を付ける（無ければ -1）。
+ * 読み上げ専用（visually-hidden）・aria-hidden・svg・script・style は可視テキストに含めない。
  */
-function checkCoreWords(rel, html) {
-  const body = stripNonContent(html.slice(html.indexOf("<body")));
-  const protectedSpans = /<span class="(?:phrase|nowrap)[^"]*"[^>]*>.*?<\/span>/gs;
-  const covered = (body.match(/<span class="nowrap core">/g) ?? []).length;
-  const without = body.replace(protectedSpans, "\u0000");
-  const blocks = [
-    ...without.matchAll(/<p\b[^>]*>(.*?)<\/p>/gs),
-    ...without.matchAll(/<div class="faq__body">(.*?)<\/div>/gs),
-  ];
-  for (const m of blocks) {
-    const text = decodeEntities(m[1].replace(/<!--.*?-->/gs, "").replace(/<[^>]+>/g, ""));
-    for (const word of CORE_WORDS) {
-      const idx = text.indexOf(word);
-      if (idx >= 0) fail(`${rel}: 核語「${word}」が折り返さない塊に入っていない（…${text.slice(Math.max(0, idx - 8), idx + word.length + 8)}…）`);
+function flattenBody(html) {
+  const start = html.indexOf("<body");
+  const body = start >= 0 ? html.slice(start) : html;
+  const root = { tag: "body", cls: new Set(), children: [], parent: null };
+  const flat = [];
+  const blockId = [];
+  const blocks = []; // {id, text, cls}
+  let cur = root;
+  let skip = 0; // visually-hidden / aria-hidden の中にいる深さ
+  const stack = [];
+  const pushSep = () => {
+    if (flat.length && flat[flat.length - 1] !== "\u0001") {
+      flat.push("\u0001");
+      blockId.push(-1);
+    }
+  };
+  const tokens = body.matchAll(/<!--.*?-->|<script\b.*?<\/script>|<style\b.*?<\/style>|<svg\b.*?<\/svg>|<(\/?)(\w+)([^>]*)>|[^<]+/gs);
+  for (const m of tokens) {
+    const tok = m[0];
+    if (tok.startsWith("<!--") || /^<(script|style|svg)\b/.test(tok)) continue;
+    if (m[2] === undefined) {
+      const text = decodeEntities(tok);
+      if (text === "") continue;
+      cur.children.push({ text });
+      if (skip === 0) {
+        const outer = stack.find((e) => e.block !== undefined);
+        for (const ch of text) {
+          flat.push(ch);
+          blockId.push(outer ? outer.block : -1);
+        }
+        if (outer) outer.text += text;
+        for (const e of stack) if (e.block !== undefined && e !== outer) e.text += text;
+      }
+      continue;
+    }
+    const tag = m[2].toLowerCase();
+    if (m[1] === "/") {
+      // 閉じタグ: スタックを該当の要素まで戻す
+      let i = stack.length - 1;
+      while (i >= 0 && stack[i].tag !== tag) i -= 1;
+      if (i >= 0) {
+        const el = stack[i];
+        stack.length = i;
+        cur = el.parent;
+        if (el.hidden) skip -= 1;
+        if (!INLINE_TAGS.has(tag) && skip === 0) pushSep();
+      }
+      continue;
+    }
+    const attrs = parseAttrs(m[3]);
+    const cls = new Set((attrs.class ?? "").split(/\s+/).filter(Boolean));
+    const el = { tag, cls, children: [], parent: cur, attrs };
+    cur.children.push(el);
+    const hidden = cls.has("visually-hidden") || attrs["aria-hidden"] === "true";
+    if (hidden) {
+      el.hidden = true;
+      skip += 1;
+    }
+    if (!INLINE_TAGS.has(tag) && skip === (hidden ? 1 : 0)) pushSep();
+    if (tag === "span" && BLOCK_CLASSES.some((c) => cls.has(c))) {
+      el.block = blocks.length;
+      el.text = "";
+      blocks.push(el);
+    }
+    if (!VOID_TAGS.has(tag) && !m[3].trimEnd().endsWith("/")) {
+      stack.push(el);
+      cur = el;
+    } else if (hidden) {
+      skip -= 1;
     }
   }
-  return covered;
+  return { root, text: flat.join(""), blockId, blocks };
+}
+
+/**
+ * 全ページの全可視テキストについて、核語（lib/core-words.ts の CORE_WORDS 全語）の不変条件を証明する:
+ *   1. 核語のすべての出現が、単一の塊（nowrap / core / phrase の span）の内部に完全に収まっている
+ *      （隣り合う塊をまたぐ出現・核語の一部だけを囲んだ塊・塊に入らない裸の出現は 0 件）。
+ *   2. <span class="… core"> の中身は、CORE_WORDS のいずれかに完全一致する（部分囲みを通さない）。
+ *   3. 核語を含む塊の長さは MAX_CORE_BLOCK_LENGTH 以下（長文を nowrap で包んで保護済みに見せない）。
+ * 例外は読み上げ専用（visually-hidden）・aria-hidden・svg・script・style・タグの属性・<head> のみ。
+ * 返り値は核語の塊（core）の数。
+ */
+function checkCoreWordInvariant(rel, html, flat) {
+  const { text, blockId, blocks } = flat;
+  for (const word of CORE_WORDS) {
+    let from = 0;
+    for (;;) {
+      const idx = text.indexOf(word, from);
+      if (idx < 0) break;
+      from = idx + 1;
+      const ids = new Set(blockId.slice(idx, idx + word.length));
+      if (ids.size !== 1 || ids.has(-1)) {
+        fail(`${rel}: 核語「${word}」が単一の塊に収まっていない（…${text.slice(Math.max(0, idx - 8), idx + word.length + 8).replace(/\u0001/g, "⏎")}…）`);
+      }
+    }
+  }
+  let cores = 0;
+  for (const b of blocks) {
+    if (b.cls.has("core")) {
+      cores += 1;
+      if (!CORE_WORDS.includes(b.text)) fail(`${rel}: 核語の塊の中身「${b.text}」が CORE_WORDS のどれにも一致しない（部分囲み）`);
+    }
+    if (CORE_WORDS.some((w) => b.text.includes(w)) && [...b.text].length > MAX_CORE_BLOCK_LENGTH) {
+      fail(`${rel}: 核語を含む塊が ${[...b.text].length} 字（上限 ${MAX_CORE_BLOCK_LENGTH}）: 「${b.text.slice(0, 20)}…」`);
+    }
+  }
+  return cores;
+}
+
+/** CSS（書き出した out/_next/static/css/*.css）から、display が flex / inline-flex / grid / inline-grid の規則の最後の複合セレクタを集める。 */
+function flexSelectors() {
+  const dir = join(OUT_DIR, "_next", "static", "css");
+  const out = [];
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".css")) continue;
+    const css = readFileSync(join(dir, name), "utf8").replace(/\/\*.*?\*\//gs, "");
+    for (const m of css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+      if (!/(?:^|;)\s*display\s*:\s*(?:inline-)?(?:flex|grid)\b/.test(m[2])) continue;
+      for (const sel of m[1].split(",")) {
+        if (sel.includes("::")) continue;
+        const last = sel.trim().split(/[\s>+~]+/).pop() ?? "";
+        const cm = /^([a-z][a-z0-9]*)?((?:\.[\w-]+)*)(?::[\w-]+(?:\([^)]*\))?)*$/i.exec(last);
+        if (!cm || (!cm[1] && !cm[2])) continue;
+        out.push({ selector: sel.trim(), tag: (cm[1] ?? "").toLowerCase(), classes: cm[2].split(".").filter(Boolean) });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * flex / grid の直接の子に、折り返さない塊（nowrap / core / phrase の span）を置かない。
+ * flex・grid コンテナの直接の子は blockify され、地の文が匿名のアイテムになって隙間・ベースラインのずれ・
+ * 行末禁則の破れ・下線の途切れが起きる（塊は、コンテナ直下ではなく、コンテナ内の 1 つのラッパー要素の中に置く）。
+ */
+function checkFlexChildren(rel, root, selectors) {
+  const visit = (el) => {
+    if (el.tag === undefined) return;
+    for (const sel of selectors) {
+      if (sel.tag && sel.tag !== el.tag) continue;
+      if (!sel.classes.every((c) => el.cls.has(c))) continue;
+      for (const child of el.children) {
+        if (child.tag === "span" && BLOCK_CLASSES.some((c) => child.cls.has(c))) {
+          fail(`${rel}: flex/grid コンテナ（${sel.selector}）の直接の子に塊（span.${[...child.cls].join(".")}）がある`);
+        }
+      }
+    }
+    for (const c of el.children) visit(c);
+  };
+  visit(root);
+}
+
+/**
+ * BigInt を使えないブラウザ向けの案内: 計算ツールの領域に静的な案内（class="bigint-note"）があり、
+ * 1 行のスクリプトが BigInt を使えない環境にだけ no-bigint を付ける。案内は CSS が通常は隠す。
+ */
+function checkBigIntNote(rel, html) {
+  if (!/<p class="bigint-note"/.test(html)) fail(`${rel}: BigInt 非対応の案内（bigint-note）が無い`);
+  if (!html.includes("<script>try{BigInt(0)}catch(e){document.documentElement.className+=' no-bigint'}</script>")) {
+    fail(`${rel}: BigInt の判定スクリプトが無い`);
+  }
+  const cssDir = join(OUT_DIR, "_next", "static", "css");
+  const css = existsSync(cssDir)
+    ? readdirSync(cssDir).filter((n) => n.endsWith(".css")).map((n) => readFileSync(join(cssDir, n), "utf8")).join("\n")
+    : "";
+  if (!/\.bigint-note\{[^}]*display:none/.test(css) || !/\.no-bigint \.bigint-note\{[^}]*display:block/.test(css)) {
+    fail(`${rel}: bigint-note を通常は隠し、no-bigint のときだけ出す CSS が無い`);
+  }
 }
 
 /**
@@ -699,6 +865,7 @@ function checkSwatchPage(rel, html) {
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
   if (!html.includes(`href="${BASE_PATH}/"`)) fail(`${rel}: トップへの導線が無い`);
   checkInputs(rel, html, ["sw-st-count", "sw-st-length", "sw-row-count", "sw-row-length"]);
+  checkBigIntNote(rel, html);
 }
 
 function checkTopPage(rel, html) {
@@ -711,6 +878,7 @@ function checkTopPage(rel, html) {
     fail(`${rel}: SoftwareApplication JSON-LD が無い`);
   }
   checkInputs(rel, html, ["g-st", "g-row", "w", "l"]);
+  checkBigIntNote(rel, html);
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) {
     fail(`${rel}: /gauge/ への導線（href="${BASE_PATH}${GAUGE_GUIDE_PATH}"）が無い`);
   }
@@ -723,11 +891,15 @@ function checkTopPage(rel, html) {
 // 実行
 // ---------------------------------------------------------------------------
 
+const FLEX_SELECTORS = [];
+
 function main() {
   if (!existsSync(OUT_DIR)) {
     fail("out/ が無い（pnpm build を先に実行すること）");
     return 0;
   }
+  FLEX_SELECTORS.push(...flexSelectors());
+  if (FLEX_SELECTORS.length === 0) fail("CSS から flex/grid の規則を読み取れない");
   const files = listHtmlFiles(OUT_DIR).map((f) => relative(OUT_DIR, f));
   const byUrl = new Map(files.map((rel) => [urlOfFile(rel), rel]));
   const locs = readSitemapLocs();
@@ -741,7 +913,9 @@ function main() {
     checkCommon(rel, html);
     checkNoPaidTerms(rel, html);
     checkPhraseBoundaries(rel, html);
-    if (checkCoreWords(rel, html) === 0 && /(^|\/)(swatch|gauge)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
+    const flat = flattenBody(html);
+    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
+    checkFlexChildren(rel, flat.root, FLEX_SELECTORS);
   }
 
   for (const loc of locs) {

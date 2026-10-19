@@ -491,9 +491,12 @@
   color: var(--text-dim);
 }
 .breadcrumb a {
-  display: inline-flex;
-  align-items: center;
+  /* inline-flex にしない: 中の核語の塊（nowrap の span）が flex アイテムになって地の文が匿名アイテム化し、
+     隙間・ベースラインのずれ・行末禁則の破れ・下線の途切れが起きる。44px は min-height と padding で確保する */
+  display: inline-block;
   min-height: 44px;
+  padding-block: 0.7em;
+  box-sizing: border-box;
 }
 
 /* 計算式（製図の注記のように方眼の上へ置く・等幅数字） */
@@ -686,9 +689,12 @@
   font-size: var(--fs-sm);
 }
 .faq__more a {
-  display: inline-flex;
-  align-items: center;
+  /* inline-flex にしない: 中の核語の塊（nowrap の span）が flex アイテムになって地の文が匿名アイテム化し、
+     隙間・ベースラインのずれ・行末禁則の破れ・下線の途切れが起きる。44px は min-height と padding で確保する */
+  display: inline-block;
   min-height: 44px;
+  padding-block: 0.7em;
+  box-sizing: border-box;
   font-weight: var(--fw-semibold);
 }
 
@@ -705,9 +711,12 @@
   margin: 0;
 }
 .footer-links a {
-  display: inline-flex;
-  align-items: center;
+  /* inline-flex にしない: 中の核語の塊（nowrap の span）が flex アイテムになって地の文が匿名アイテム化し、
+     隙間・ベースラインのずれ・行末禁則の破れ・下線の途切れが起きる。44px は min-height と padding で確保する */
+  display: inline-block;
   min-height: 44px;
+  padding-block: 0.7em;
+  box-sizing: border-box;
 }
 
 /* ===== ゲージの測り方（/swatch/）: 番号付きの編み地断面図 ===== */
@@ -950,7 +959,7 @@ body {
   font-weight: var(--fw-semibold);
 }
 .swatch-calc__num b {
-  margin-inline: 0.3em 0.15em;
+  margin-inline: 0 0.15em;
   font-size: clamp(1.8rem, 6vw, 2.4rem);
   font-weight: var(--fw-black);
   color: var(--text);
@@ -982,9 +991,12 @@ body {
   color: var(--text-dim);
 }
 .swatch-calc__next a {
-  display: inline-flex;
-  align-items: center;
+  /* inline-flex にしない: 中の核語の塊（nowrap の span）が flex アイテムになって地の文が匿名アイテム化し、
+     隙間・ベースラインのずれ・行末禁則の破れ・下線の途切れが起きる。44px は min-height と padding で確保する */
+  display: inline-block;
   min-height: 44px;
+  padding-block: 0.7em;
+  box-sizing: border-box;
   font-weight: var(--fw-semibold);
 }
 .swatch-calc .field-pair {
@@ -1031,4 +1043,18 @@ body {
 .fig--count .fig-text,
 .fig--wash .fig-text {
   stroke: var(--surface);
+}
+
+/* BigInt に対応していないブラウザ向けの案内（app/BigIntNote.tsx）。対応ブラウザでは出さない */
+.bigint-note {
+  display: none;
+  margin: var(--sp-4) 0;
+  padding: var(--sp-3) var(--sp-4);
+  border-left: 3px solid var(--err);
+  background: var(--err-tint);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.no-bigint .bigint-note {
+  display: block;
 }

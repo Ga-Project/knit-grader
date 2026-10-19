@@ -113,12 +113,20 @@ export default function SwatchGuide() {
             <nav className="breadcrumb" aria-label="パンくずリスト">
               <ol>
                 <li>
-                  <Link href="/">ニットゲージ計算</Link>
+                  <Link href="/">
+                    <Words text="ニットゲージ計算" />
+                  </Link>
                 </li>
-                <li aria-current="page">{PAGE_NAME}</li>
+                <li aria-current="page">
+                  <span>
+                    <Words text={PAGE_NAME} />
+                  </span>
+                </li>
               </ol>
             </nav>
-            <span className="eyebrow">ゲージの使い方</span>
+            <span className="eyebrow">
+              <Words text="ゲージの使い方" />
+            </span>
             <h1>
               <Phrased text={PAGE_NAME} />
             </h1>
@@ -141,8 +149,7 @@ export default function SwatchGuide() {
           <div className="container container-narrow">
             <span className="eyebrow">手順</span>
             <h2 id="steps-heading">
-              <span className="nowrap">スワッチを測る</span>
-              <span className="nowrap">4つの手順</span>
+              <Phrased text="スワッチを測る4つの手順" />
             </h2>
             <ol className="section-plan">
               {steps.map((s, i) => (
@@ -171,8 +178,7 @@ export default function SwatchGuide() {
           <div className="container container-narrow">
             <span className="eyebrow">換算</span>
             <h2 id="calc-heading">
-              <span className="nowrap">数えた数から</span>
-              <span className="nowrap">10cmあたりを出す</span>
+              <Phrased text="数えた数から10cmあたりを出す" />
             </h2>
             <p>
               <Words text="数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、小数第1位で表しきれないときは「約」を付けます。整数のゲージとして使うときは四捨五入した値も示します。" />
@@ -199,7 +205,7 @@ export default function SwatchGuide() {
           <div className="container container-narrow">
             <span className="eyebrow">よくある質問</span>
             <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}>
-              ゲージの測り方のよくある質問
+              <Phrased text="ゲージの測り方のよくある質問" />
             </h2>
             <FaqList faqs={faqs} />
           </div>
@@ -207,7 +213,9 @@ export default function SwatchGuide() {
 
         <section className="guide-section guide-cta" aria-labelledby="cta-heading">
           <div className="container container-narrow">
-            <h2 id="cta-heading">測ったゲージで計算する</h2>
+            <h2 id="cta-heading">
+              <Phrased text="測ったゲージで計算する" />
+            </h2>
             <p>
               <Words text="計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。" />
             </p>

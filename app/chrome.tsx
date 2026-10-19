@@ -15,7 +15,9 @@ export function SiteHeader() {
           <span className="brand-mark" aria-hidden="true">
             <StitchMark size={18} />
           </span>
-          <span>ニットゲージ計算</span>
+          <span>
+            <Words text="ニットゲージ計算" />
+          </span>
         </Link>
       </div>
     </header>
@@ -43,7 +45,7 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
               href={GAUGE_GUIDE_PATH}
               aria-current={current === "gauge" ? "page" : undefined}
             >
-              ゲージから目数・段数を出す方法
+              <Words text="ゲージから目数・段数を出す方法" />
             </Link>
           </li>
           <li>
@@ -51,7 +53,7 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
               href={SWATCH_GUIDE_PATH}
               aria-current={current === "swatch" ? "page" : undefined}
             >
-              ゲージの測り方
+              <Words text="ゲージの測り方" />
             </Link>
           </li>
           <li>

@@ -4,10 +4,11 @@
 // 入力は保存しない（ストレージなし）。換算の実体は lib/grading.ts の per10cmFromCount、
 // 表示する状態の分岐は lib/swatch-guide.ts の swatchRowState（単体テスト済み）。
 // 結果欄は高さを固定し、空・エラー・結果のどれでも下の要素が動かない。
+import { BigIntNote } from "../BigIntNote";
 import { Words } from "../Words";
 import { useState } from "react";
 import Link from "next/link";
-import { MAX_MEASURE, MIN_MEASURE } from "@/lib/grading";
+import { MAX_INPUT_LENGTH, MAX_MEASURE, MIN_MEASURE } from "@/lib/grading";
 import {
   integerNote,
   per10cmParts,
@@ -55,7 +56,7 @@ function ConvertRow({
               type="text"
               inputMode="decimal"
               autoComplete="off"
-              maxLength={8}
+              maxLength={MAX_INPUT_LENGTH}
               placeholder={countPlaceholder}
               value={count}
               onChange={(e) => setCount(e.target.value)}
@@ -73,7 +74,7 @@ function ConvertRow({
               type="text"
               inputMode="decimal"
               autoComplete="off"
-              maxLength={8}
+              maxLength={MAX_INPUT_LENGTH}
               placeholder={lengthPlaceholder}
               value={length}
               onChange={(e) => setLength(e.target.value)}
@@ -132,6 +133,7 @@ function ConvertRow({
 export function SwatchCalc() {
   return (
     <div className="swatch-calc">
+      <BigIntNote />
       <ConvertRow
         id="sw-st"
         title="目数（横）"

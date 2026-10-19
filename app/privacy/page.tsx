@@ -23,7 +23,7 @@ export default function Privacy() {
           <div className="container container-narrow">
             <span className="eyebrow">プライバシー</span>
             <h1>
-              <span className="nowrap">プライバシー</span>について
+              <Phrased text="プライバシーについて" />
             </h1>
 
             <h2><Phrased text="入力データの保存" /></h2>

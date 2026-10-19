@@ -52,6 +52,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="ja">
       <body>
         <script
+          // BigInt を使えない環境にだけ no-bigint を付ける（計算ツールの案内を出す。app/BigIntNote.tsx）
+          dangerouslySetInnerHTML={{ __html: "try{BigInt(0)}catch(e){document.documentElement.className+=' no-bigint'}" }}
+        />
+        <script
           type="application/ld+json"
           // 静的な自前オブジェクトのみ（外部入力なし）。"<" は serializeJsonLd でエスケープする。
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
