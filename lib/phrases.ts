@@ -10,7 +10,7 @@
 //   2. 閉じ括弧の直後（直後が助詞なら助詞の後ろ）。開き括弧の直前
 //   3. 空白（数式の内側は除く）
 //   4. 助詞（は が を に で の と も へ や から まで より）の直後。ただし
-//      助詞が漢字・カタカナ・英数・閉じ括弧の直後にあり、次の文字がひらがなでないときだけ
+//      助詞が漢字・カタカナ・英数・閉じ括弧・句読点・空白の直後にあり、次の文字がひらがなでないときだけ
 //      （「ひと回り」「ゲージが|合わなく」「目数と|段数」「10cmより|大きめに」）
 // 単位付き数値（10cm）や数式（25 ÷ 12 × 10≈20.8）は途中で区切らない。区切った文字列を連結すると元に戻る。
 
@@ -53,7 +53,8 @@ export function splitPhrases(text: string): string[] {
       const after = chars[i + n];
       if (after !== undefined && !isKana(after) && !BREAK_AFTER.test(after) && !CLOSERS.test(after)) {
         const before = chars[i - 1];
-        if (before !== undefined && !/\s/.test(before)) cuts.add(i + n);
+        // 句読点・空白の直後の助詞は、直前の区切りで片が始まるので、助詞だけの片を作らない
+        if (before !== undefined && !/\s/.test(before) && !BREAK_AFTER.test(before)) cuts.add(i + n);
       }
     }
   }
@@ -103,8 +104,9 @@ export function isValidPhraseBoundary(x: string, y: string): boolean {
     for (const p of PARTICLES) {
       const pc = [...p];
       if (a.slice(a.length - pc.length).join("") === p) {
+        // 助詞の前が非ひらがな、または助詞だけの片（句読点・空白の直後で始まった助詞）なら許す
         const before = a[a.length - pc.length - 1];
-        if (before !== undefined && !isKana(before)) return true;
+        if (before === undefined || !isKana(before)) return true;
       }
     }
   }

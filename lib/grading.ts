@@ -68,8 +68,8 @@ export function parseMeasure(input: string): number | null {
   return value;
 }
 
-/** 桁区切りのカンマ（「1,250」「12,345.5」）。 */
-const THOUSANDS = /^\d{1,3}(?:,\d{3})+(?:\.\d*)?$/;
+/** 桁区切りのカンマ（「1,250」「12,345.5」。「1234,567」のように区切り位置が正しくないものも、カンマの使い方として案内する）。 */
+const THOUSANDS = /^\d+(?:,\d{3})+(?:\.\d*)?$/;
 
 /**
  * 入力欄の文字列が解釈できないときのエラー文言を原因別に返す。空・有効なら null。
@@ -119,6 +119,8 @@ export interface Frac {
  * 8.8 は 88/10、1.15 は 115/100（2 進で近似した値ではなく、人が書いた小数どおり）。
  */
 export function fracFromNumber(x: number): Frac {
+  // 非有限は RangeError。呼び出し元は有限であることを検証済みであること
+  // （parseMeasure が通した値・per10cmFrac・countFrac などの公開関数は非有限を先に弾き、NaN を返す）。
   const m = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]\d+))?$/.exec(String(x));
   if (!m || !Number.isFinite(x)) throw new RangeError(`fracFromNumber: finite number expected (${String(x)})`);
   const frac = m[3] ?? "";
@@ -155,7 +157,12 @@ export function fracIsInteger(f: Frac): boolean {
   return f.n % f.d === 0n;
 }
 
-/** 最も近い数（20 桁の小数へ打ち切ってから変換。ちょうど表せる値は誤差なし）。 */
+/**
+ * 分数を数にする。小数点以下 20 桁へ打ち切った 10 進値を Number に変換する（その 10 進値に最も近い数）。
+ * 最近傍へ丸める厳密な除算ではないが、打ち切りの誤差（1e-20 未満）は表示・判定に影響しない。
+ * 表示や丸めの判定には使わず（それらは分数のまま整数演算で行う）、画面に出す近似値や
+ * 範囲の比較に使う。10 進で有限に表せる値（12.5・6.25 など）は誤差なしで返る。
+ */
 export function fracToNumber(f: Frac): number {
   const neg = f.n < 0n;
   const n = neg ? -f.n : f.n;
@@ -165,13 +172,37 @@ export function fracToNumber(f: Frac): number {
   return neg ? -Number(text) : Number(text);
 }
 
-/** 小数第 1 位へ四捨五入した値（例 6.25 → 6.3）。数は 10 進表記どおりの分数として扱う。 */
+/** 小数第 digits 位へ四捨五入した値の 10^digits 倍（整数）。 */
+export function fracRoundDigits(f: Frac, digits: number): bigint {
+  return fracRoundHalfUp({ n: f.n * 10n ** BigInt(digits), d: f.d });
+}
+
+/** 10^digits 倍した整数 n を小数点以下 digits 桁の文字列にし、末尾の 0 を落とす（整数なら整数）。 */
+export function formatScaled(n: bigint, digits: number): string {
+  const neg = n < 0n;
+  const abs = (neg ? -n : n).toString().padStart(digits + 1, "0");
+  const whole = digits === 0 ? abs : abs.slice(0, -digits);
+  const frac = digits === 0 ? "" : abs.slice(-digits).replace(/0+$/, "");
+  return `${neg ? "-" : ""}${whole}${frac === "" ? "" : `.${frac}`}`;
+}
+
+/** 10 進文字列（符号なし）を分数にする。解釈できなければ null。 */
+export function fracFromDecimalString(text: string): Frac | null {
+  const m = /^(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!m) return null;
+  const frac = m[2] ?? "";
+  return { n: BigInt(`${m[1]}${frac}`), d: 10n ** BigInt(frac.length) };
+}
+
+/** 小数第 1 位へ四捨五入した値（例 6.25 → 6.3）。数は 10 進表記どおりの分数として扱う。非有限は NaN。 */
 export function roundToTenths(value: number): number {
+  if (!Number.isFinite(value)) return NaN;
   return Number(fracRoundTenths(fracFromNumber(value))) / 10;
 }
 
-/** 四捨五入して整数にした値（例 12.5 → 13）。 */
+/** 四捨五入して整数にした値（例 12.5 → 13）。非有限は NaN。 */
 export function roundToInteger(value: number): number {
+  if (!Number.isFinite(value)) return NaN;
   return Number(fracRoundHalfUp(fracFromNumber(value)));
 }
 
@@ -186,11 +217,13 @@ export function countFrac(per10cm: number, lengthCm: number): Frac {
  * 計算式の実体はここだけに置く（ツールとガイドの数字が食い違わないようにするため）。
  */
 export function rawCountForLength(per10cm: number, lengthCm: number): number {
+  if (!Number.isFinite(per10cm) || !Number.isFinite(lengthCm)) return NaN;
   return fracToNumber(countFrac(per10cm, lengthCm));
 }
 
 /** 10cm あたりの目数(または段数)と寸法(cm)から、必要な目数(または段数)を求める（厳密な四捨五入）。 */
 export function countForLength(per10cm: number, lengthCm: number): number {
+  if (!Number.isFinite(per10cm) || !Number.isFinite(lengthCm)) return NaN;
   return Number(fracRoundHalfUp(countFrac(per10cm, lengthCm)));
 }
 

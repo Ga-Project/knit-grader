@@ -70,6 +70,9 @@ export function analyzeGaugeInputs(inputs: GaugeInputs): GaugeInputState {
 /** localStorage に保存する形（4 欄とも文字列）。 */
 export type SavedInputs = GaugeInputs;
 
+/** 保存値 1 欄の最大の長さ。これを超える値は壊れた保存値として破棄する（入力欄は 8 文字まで）。 */
+export const MAX_SAVED_LENGTH = 32;
+
 const EMPTY_SAVED: SavedInputs = { gaugeSt: "", gaugeRow: "", width: "", length: "" };
 
 /**
@@ -78,7 +81,7 @@ const EMPTY_SAVED: SavedInputs = { gaugeSt: "", gaugeRow: "", width: "", length:
  * 復元しない。復元バナーとエラーが同時に出ないようにする）。
  */
 export function restoreField(value: unknown): string {
-  if (typeof value !== "string") return "";
+  if (typeof value !== "string" || value.length > MAX_SAVED_LENGTH) return "";
   return parseMeasure(value) !== null ? normalizeMeasureText(value) : "";
 }
 

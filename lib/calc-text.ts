@@ -5,13 +5,18 @@
 // 検査関数はテストと、書き出した HTML の検査（scripts/verify-export.mjs）の両方から使う。
 import {
   countForLength,
+  countFrac,
+  fracFromDecimalString,
+  fracFromNumber,
+  fracIsInteger,
+  fracRoundDigits,
+  fracRoundHalfUp,
+  formatScaled,
   lengthForCount,
   rawCountForLength,
   roundToTenths,
 } from "./grading.ts";
-
-/** 浮動小数の誤差（4.8×22＝105.60000000000001 等）を同じ値とみなす幅。 */
-const EPSILON = 1e-9;
+import { exactCountInteger, matchCountDisplay, roundDecimalToInteger } from "./exact-check.ts";
 
 /** 小数第 1 位へ四捨五入（厳密。1.15 → 1.2、6.25 → 6.3）。grading.ts の整数演算を通す。 */
 function round1(value: number): number {
@@ -23,9 +28,14 @@ export function formatDecimal(value: number): string {
   return String(round1(value));
 }
 
-/** 小数第1位へ丸めると値が変わる（表示が近似になる）とき true。 */
+/**
+ * 小数第1位へ丸めると値が変わる（表示が近似になる）とき true。
+ * 数は 10 進表記どおりの分数にして、10 倍が整数かどうかを整数演算で判定する（許容幅を使わない）。
+ */
 export function isApprox(value: number): boolean {
-  return Math.abs(round1(value) - value) > EPSILON;
+  if (!Number.isFinite(value)) return false;
+  const f = fracFromNumber(value);
+  return !fracIsInteger({ n: f.n * 10n, d: f.d });
 }
 
 /** 寸法の表示（小数第1位へ丸め、丸めたときは「約」を付ける）。 */
@@ -71,23 +81,30 @@ const MAX_DIGITS = 10;
 /**
  * 途中値の表示。割り切れるなら整数。割り切れないなら、表示した値を四捨五入すると
  * 目数（count）に一致する最小の小数桁数で出す（例 105.4704 → 「105.47」。「105.5」は
- * 四捨五入すると 106 になり、表示と結果が食い違うので採らない）。
+ * 四捨五入すると 106 になり、表示と結果が食い違うので採らない。例 1.45 → 「1.5」は 2 になるので採らず「1.45」）。
+ * 丸め・照合はすべて整数演算（分数）で行い、.5 の境界を浮動小数で外さない。
  */
-function rawDisplay(raw: number, count: number, rounded: boolean): string {
-  if (!rounded) return String(count);
+function rawDisplay(step: CalcStep, rounded: boolean): string {
+  if (!rounded) return String(step.count);
+  const f = countFrac(step.per10cm, step.lengthCm);
   for (let digits = 1; digits <= MAX_DIGITS; digits += 1) {
-    const text = String(Number(raw.toFixed(digits)));
-    if (text.includes(".") && Math.round(Number(text)) === count) return text;
+    const text = formatScaled(fracRoundDigits(f, digits), digits);
+    const shown = fracFromDecimalString(text);
+    if (text.includes(".") && shown !== null && Number(fracRoundHalfUp(shown)) === step.count) return text;
   }
-  return String(raw);
+  return String(step.raw);
 }
 
 export function calcParts(step: CalcStep): CalcParts {
-  const rounded = Math.abs(step.raw - step.count) > EPSILON;
-  const rawText = rawDisplay(step.raw, step.count, rounded);
+  const f = countFrac(step.per10cm, step.lengthCm);
+  const rounded = !fracIsInteger(f);
+  const rawText = rawDisplay(step, rounded);
+  const shown = fracFromDecimalString(rawText);
+  // 表示した途中値が、厳密な値と完全に等しいときだけ「＝」、丸めた表示なら「≈」
+  const exact = shown !== null && shown.n * f.d === f.n * shown.d;
   return {
     expression: `${String(step.lengthCm)} ÷ 10 × ${String(step.per10cm)}`,
-    relation: Math.abs(Number(rawText) - step.raw) > EPSILON ? "≈" : "＝",
+    relation: exact ? "＝" : "≈",
     rawText,
     rounded,
     count: step.count,
@@ -125,16 +142,13 @@ export function finishedCm(per10cm: number, count: number): string {
 const EQUATION =
   /(\d+(?:\.\d+)?)÷10×(\d+(?:\.\d+)?)(＝|≈)(\d+(?:\.\d+)?)(?:(?:を|→)四捨五入して(\d+))?/g;
 
-function decimals(text: string): number {
-  return text.includes(".") ? text.length - text.indexOf(".") - 1 : 0;
-}
-
 /**
  * 本文中の計算式をすべて探し、計算結果と食い違う主張を返す。
  * 入力値は本文から読み取るので、例の入力値を変えても言い切りが計算結果に従っているかを検査できる。
- * 主張の意味で判定する:
- *   ＝ … 表示値が途中値そのもの（誤差のみ）
- *   ≈ … 表示値が途中値を表示桁で丸めたもの（表示値≠途中値）
+ * 期待値は lib/exact-check.ts（10 進文字列の BigInt 演算。実装側の分数演算とコードを共有しない）が
+ * 厳密に求め、表示値との一致を文字列として判定する（許容幅を使わない。丸めの境界 .5 は切り上げに一意に決まる）:
+ *   ＝ … 表示値が途中値そのもの
+ *   ≈ … 表示値が途中値を表示桁へ四捨五入したもの（途中値そのものではない）
  *   四捨五入して N … 割り切れず、N が目数で、表示値を四捨五入しても N
  *   四捨五入なし … 割り切れて、表示値が目数そのもの
  */
@@ -146,29 +160,34 @@ export function findEquationErrors(text: string): { found: number; errors: strin
     found += 1;
     const [whole, len, per, relation, value, roundedTo] = m;
     if (len === undefined || per === undefined || value === undefined) continue;
-    const step = calcStep(Number(per), Number(len));
-    const shown = Number(value);
-    const diff = Math.abs(shown - step.raw);
-    const halfUnit = 0.5 * 10 ** -decimals(value);
-    if (relation === "＝" && diff > EPSILON) {
-      errors.push(`${whole}: 「＝」だが途中値は ${step.raw}`);
+    const match = matchCountDisplay(per, len, value);
+    const integer = exactCountInteger(per, len);
+    if (match === null || integer === null) {
+      errors.push(`${whole}: 照合できない数値`);
+      continue;
     }
-    if (relation === "≈" && (diff <= EPSILON || diff > halfUnit + EPSILON)) {
-      errors.push(`${whole}: 「≈」の表示 ${value} が途中値 ${step.raw} の丸めになっていない`);
+    if (relation === "＝" && match !== "exact") {
+      errors.push(`${whole}: 「＝」だが表示値 ${value} は途中値そのものではない`);
     }
-    const rounded = Math.abs(step.raw - step.count) > EPSILON;
-    if (rounded) {
+    if (relation === "≈" && match !== "rounded") {
+      errors.push(
+        match === "exact"
+          ? `${whole}: 「≈」だが表示値 ${value} は途中値そのもの`
+          : `${whole}: 「≈」の表示 ${value} が途中値の丸めになっていない`,
+      );
+    }
+    if (!integer.isInteger) {
       if (roundedTo === undefined) {
-        errors.push(`${whole}: 割り切れない（${step.raw}）のに四捨五入を書いていない`);
-      } else if (roundedTo !== String(step.count)) {
-        errors.push(`${whole}: 四捨五入した値は ${step.count}`);
+        errors.push(`${whole}: 割り切れないのに四捨五入を書いていない`);
+      } else if (roundedTo !== integer.integer) {
+        errors.push(`${whole}: 四捨五入した値は ${integer.integer}`);
       }
-      if (Math.round(shown) !== step.count) {
-        errors.push(`${whole}: 途中値の表示 ${value} を四捨五入すると ${step.count} にならない`);
+      if (roundDecimalToInteger(value) !== integer.integer) {
+        errors.push(`${whole}: 途中値の表示 ${value} を四捨五入すると ${integer.integer} にならない`);
       }
     } else {
       if (roundedTo !== undefined) errors.push(`${whole}: 割り切れるのに四捨五入と書いている`);
-      if (value !== String(step.count)) errors.push(`${whole}: 値は ${step.count}`);
+      if (value !== integer.integer) errors.push(`${whole}: 値は ${integer.integer}`);
     }
   }
   return { found, errors };

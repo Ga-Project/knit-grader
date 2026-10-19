@@ -12,15 +12,12 @@ import {
   parseMeasure,
   per10cmFrac,
 } from "./grading.ts";
-import { exactPer10 } from "./exact-check.ts";
+import { exactPer10, matchPer10Display } from "./exact-check.ts";
 import type { FaqItem } from "./json-ld.ts";
 
 /** サイト内でのページのパス（trailingSlash:true に合わせ末尾スラッシュ）。 */
 export const SWATCH_GUIDE_PATH = "/swatch/";
 
-const EPSILON = 1e-9;
-/** 表示桁で丸めたときの最大誤差は表示桁の半分（テキスト中の「≈」「＝」の表示値の検査用）。 */
-const HALF = 0.5;
 
 /** 数えた数と測った長さから出した 10cm あたりの値と、その表示。 */
 export interface Per10cmResult {
@@ -196,11 +193,11 @@ export function swatchRowState(countText: string, lengthText: string): SwatchRow
  */
 const PER10_EQUATION = /(\d+(?:\.\d+)?)÷(\d+(?:\.\d+)?)×10(＝|≈)(約?)(\d+(?:\.\d+)?)/g;
 
-function decimals(text: string): number {
-  return text.includes(".") ? text.length - text.indexOf(".") - 1 : 0;
-}
-
-/** 本文中の換算式（＝／≈）を探し、計算結果と食い違う主張を返す。 */
+/**
+ * 本文中の換算式（＝／≈）を探し、計算結果と食い違う主張を返す。期待値は lib/exact-check.ts が厳密に求め、
+ * 表示値との一致を文字列として判定する（許容幅を使わない）:
+ *   ＝ … 表示値が値そのもの（「約」は付けない）／≈ … 表示値が値を表示桁へ四捨五入したもの（値そのものではない）
+ */
 export function findPer10Errors(text: string): { found: number; errors: string[] } {
   const normalized = text.replace(/\s+/g, "");
   const errors: string[] = [];
@@ -209,20 +206,23 @@ export function findPer10Errors(text: string): { found: number; errors: string[]
     found += 1;
     const [whole, count, len, relation, approxMark, value] = m;
     if (count === undefined || len === undefined || value === undefined) continue;
-    const r = per10cmResult(Number(count), Number(len));
-    if (r === null) {
+    const match = matchPer10Display(count, len, value);
+    if (match === null) {
       errors.push(`${whole}: 換算できない入力`);
       continue;
     }
-    const diff = Math.abs(Number(value) - r.raw);
     if (relation === "＝" && approxMark === "約") {
       errors.push(`${whole}: 「＝」に「約」が付いている`);
     }
-    if (relation === "＝" && diff > EPSILON) {
-      errors.push(`${whole}: 「＝」だが値は ${r.raw}`);
+    if (relation === "＝" && match !== "exact") {
+      errors.push(`${whole}: 「＝」だが表示値 ${value} は値そのものではない`);
     }
-    if (relation === "≈" && (diff <= EPSILON || diff > HALF * 10 ** -decimals(value) + EPSILON)) {
-      errors.push(`${whole}: 「≈」の表示 ${value} が ${r.raw} の丸めになっていない`);
+    if (relation === "≈" && match !== "rounded") {
+      errors.push(
+        match === "exact"
+          ? `${whole}: 「≈」だが表示値 ${value} は値そのもの`
+          : `${whole}: 「≈」の表示 ${value} が値の丸めになっていない`,
+      );
     }
   }
   return { found, errors };

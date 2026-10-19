@@ -58,3 +58,66 @@ export function exactCountForLength(perText: string, lengthText: string): string
   const den = 10n * pow10(p.scale + l.scale);
   return String(divRound(p.int * l.int, den));
 }
+
+// ---------------------------------------------------------------------------
+// 本文中の等式（「…＝105.6」「…≈105.47」）の検査用: 表示値が厳密な値の何にあたるか
+// ---------------------------------------------------------------------------
+
+interface Rat {
+  num: bigint;
+  den: bigint;
+}
+
+/** per × length ÷ 10（目数・段数の四捨五入前の値）。 */
+function ratCount(perText: string, lengthText: string): Rat | null {
+  const p = parseDecimal(perText);
+  const l = parseDecimal(lengthText);
+  if (p === null || l === null || p.int === 0n || l.int === 0n) return null;
+  return { num: p.int * l.int, den: 10n * pow10(p.scale + l.scale) };
+}
+
+/** count × 10 ÷ length（10cm あたり）。 */
+function ratPer10(countText: string, lengthText: string): Rat | null {
+  const c = parseDecimal(countText);
+  const l = parseDecimal(lengthText);
+  // 0 目・0cm は換算の対象外（検査では「換算できない入力」にする）
+  if (c === null || l === null || c.int === 0n || l.int === 0n) return null;
+  return { num: c.int * 10n * pow10(l.scale), den: l.int * pow10(c.scale) };
+}
+
+export type DisplayMatch = "exact" | "rounded" | "wrong";
+
+/**
+ * 表示値 valueText（小数点以下 d 桁）が、厳密な値 rat に対して何か。
+ *   exact … 値そのもの／rounded … 値を d 桁へ四捨五入（.5 は切り上げ）したもの（値そのものではない）／wrong … それ以外
+ */
+function matchDisplay(rat: Rat | null, valueText: string): DisplayMatch | null {
+  const v = parseDecimal(valueText);
+  if (rat === null || v === null) return null;
+  if (v.int * rat.den === rat.num * pow10(v.scale)) return "exact";
+  return v.int === divRound(rat.num * pow10(v.scale), rat.den) ? "rounded" : "wrong";
+}
+
+/** 目数・段数の等式（per × length ÷ 10）の表示値の照合。 */
+export function matchCountDisplay(perText: string, lengthText: string, valueText: string): DisplayMatch | null {
+  return matchDisplay(ratCount(perText, lengthText), valueText);
+}
+
+/** 10cm あたりの等式（count × 10 ÷ length）の表示値の照合。 */
+export function matchPer10Display(countText: string, lengthText: string, valueText: string): DisplayMatch | null {
+  return matchDisplay(ratPer10(countText, lengthText), valueText);
+}
+
+/** 目数・段数（per × length ÷ 10）を四捨五入した整数と、割り切れるか。 */
+export function exactCountInteger(perText: string, lengthText: string): { integer: string; isInteger: boolean } | null {
+  const r = ratCount(perText, lengthText);
+  if (r === null) return null;
+  return { integer: String(divRound(r.num, r.den)), isInteger: r.num % r.den === 0n };
+}
+
+/** 10 進文字列を整数へ四捨五入（.5 は切り上げ）した値。"105.47" → "105"、"81.5" → "82"。 */
+export function roundDecimalToInteger(text: string): string | null {
+  const v = parseDecimal(text);
+  if (v === null) return null;
+  return String(divRound(v.int, pow10(v.scale)));
+}
