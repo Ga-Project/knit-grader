@@ -4,6 +4,13 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.8.0",
+  "browserslist": [
+    "chrome >= 67",
+    "edge >= 79",
+    "firefox >= 68",
+    "safari >= 14",
+    "ios_saf >= 14"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

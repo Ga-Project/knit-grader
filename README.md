@@ -29,6 +29,14 @@ pnpm build                 # next build → out/ に書き出し
 pnpm test                  # node --test（中核ロジックの単体テスト・追加依存なし）
 ```
 
+## 対応ブラウザ
+
+`package.json` の `browserslist` が下限の宣言。Chrome 67 以上・Edge 79 以上・Firefox 68 以上・Safari 14 以上・iOS Safari 14 以上。
+ゲージ計算は丸めの誤差を避けるため BigInt（整数演算）を使うので、BigInt のない環境（Safari 13 以前など）では
+スクリプトが読み込めず、計算ツール・換算の部品は動かない。説明・FAQ・ガイドの本文は静的な HTML として書き出して
+いるので、スクリプトが動かない環境でも表示される。折り返しは `word-break: auto-phrase` に対応するブラウザ
+（Chrome 系）で文節に揃い、未対応のブラウザでは標準の和文折り返しになる（短い見出し・ヒントだけは文節で区切って保護している）。
+
 ## 公開前に設定する値（`app/config.ts`）
 
 秘密情報ではない公開値。
