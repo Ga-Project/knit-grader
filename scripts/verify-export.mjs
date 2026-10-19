@@ -29,7 +29,7 @@ import { SITE_URL, OG_IMAGE_URL, GOATCOUNTER_CODE } from "../app/config.ts";
 import { countForLength } from "../lib/grading.ts";
 import { findEquationErrors, finishedCm } from "../lib/calc-text.ts";
 import { GAUGE_GUIDE_PATH } from "../lib/gauge-guide.ts";
-import { per10cmResult, per10cmText, findPer10Errors, SWATCH_GUIDE_PATH } from "../lib/swatch-guide.ts";
+import { per10cmParts, per10cmResult, per10cmText, findPer10Errors, SWATCH_GUIDE_PATH } from "../lib/swatch-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -356,18 +356,20 @@ function readSitemapLocs() {
 // /gauge/ とトップ
 // ---------------------------------------------------------------------------
 
-function checkGaugePage(rel, html) {
+/**
+ * FAQPage / BreadcrumbList の JSON-LD と、本文の FAQ・パンくずの一致（ガイドページ共通）。
+ * FAQ は min〜max 件、Q/A は本文に同じ文字列で載っていること、パンくずは SITE_URL → pageUrl。
+ */
+function checkFaqAndCrumbs(rel, html, text, { pageUrl, min, max }) {
   const blocks = jsonLdBlocks(rel, html);
   const faq = blocks.find((b) => b["@type"] === "FAQPage");
   const crumbs = blocks.find((b) => b["@type"] === "BreadcrumbList");
   if (!faq) fail(`${rel}: FAQPage JSON-LD が無い`);
   if (!crumbs) fail(`${rel}: BreadcrumbList JSON-LD が無い`);
-
-  const text = visibleText(html);
   if (faq) {
     const items = faq.mainEntity ?? [];
     const detailsCount = (html.match(/<details\s+class="faq__item"/g) ?? []).length;
-    if (items.length < 3 || items.length > 5) fail(`${rel}: FAQ が ${items.length} 件（3〜5件）`);
+    if (items.length < min || items.length > max) fail(`${rel}: FAQ が ${items.length} 件（${min}〜${max}件）`);
     if (items.length !== detailsCount) {
       fail(`${rel}: FAQPage ${items.length} 件と本文の FAQ ${detailsCount} 件が一致しない`);
     }
@@ -380,9 +382,15 @@ function checkGaugePage(rel, html) {
   if (crumbs) {
     const list = crumbs.itemListElement ?? [];
     const last = list[list.length - 1];
-    if (!last || last.item !== GAUGE_URL) fail(`${rel}: パンくずの末尾が ${GAUGE_URL} でない`);
+    if (!last || last.item !== pageUrl) fail(`${rel}: パンくずの末尾が ${pageUrl} でない`);
     if (!list[0] || list[0].item !== SITE_URL) fail(`${rel}: パンくずの先頭が ${SITE_URL} でない`);
   }
+  return blocks;
+}
+
+function checkGaugePage(rel, html) {
+  const text = visibleText(html);
+  checkFaqAndCrumbs(rel, html, text, { pageUrl: GAUGE_URL, min: 3, max: 5 });
 
   // 本文中の計算式（「＝」「≈」「四捨五入して」の主張）が計算結果と一致するか
   const eq = findEquationErrors(text);
@@ -477,57 +485,83 @@ function checkMarkers(rel, html) {
   }
 }
 
-/** /swatch/: JSON-LD・FAQ・実例の表示値・換算式・換算部品の空状態・相互リンク。 */
+/** 有料機能・課金・書き出しを示す語（無料のままであることの検査）。 */
+const PAID_TERMS = /有料|課金|書き出し|エクスポート|サブスク|プレミアム|Pro版/;
+
+/** 本文・meta（description/og/twitter）・JSON-LD のいずれにも有料機能を示す語が無いこと。 */
+function checkNoPaidTerms(rel, html, text, blocks) {
+  const metaTexts = tags(html, "meta")
+    .filter((a) => /^(description|og:|twitter:)/.test(a.name ?? a.property ?? ""))
+    .map((a) => a.content ?? "");
+  const sources = [
+    ["本文", text],
+    ["meta", metaTexts.join("\n")],
+    ["JSON-LD", JSON.stringify(blocks)],
+  ];
+  for (const [where, value] of sources) {
+    const m = value.match(PAID_TERMS);
+    if (m) fail(`${rel}: ${where}に有料機能を示す語「${m[0]}」がある`);
+  }
+}
+
+/** class 属性に指定のクラスを持つか。 */
+function hasClass(attrs, name) {
+  return (attrs.class ?? "").split(/\s+/).includes(name);
+}
+
+/**
+ * /swatch/: JSON-LD・FAQ・実例（表示値・換算式の関係・ラベルの取り違え）・
+ * 換算部品の空状態・相互リンク・有料語なし。
+ */
 function checkSwatchPage(rel, html) {
-  const blocks = jsonLdBlocks(rel, html);
-  const faq = blocks.find((b) => b["@type"] === "FAQPage");
-  const crumbs = blocks.find((b) => b["@type"] === "BreadcrumbList");
-  if (!faq) fail(`${rel}: FAQPage JSON-LD が無い`);
-  if (!crumbs) fail(`${rel}: BreadcrumbList JSON-LD が無い`);
   const text = visibleText(html);
-  if (faq) {
-    const items = faq.mainEntity ?? [];
-    const detailsCount = (html.match(/<details\s+class="faq__item"/g) ?? []).length;
-    if (items.length < 3 || items.length > 4) fail(`${rel}: FAQ が ${items.length} 件（3〜4件）`);
-    if (items.length !== detailsCount) {
-      fail(`${rel}: FAQPage ${items.length} 件と本文の FAQ ${detailsCount} 件が一致しない`);
-    }
-    for (const q of items) {
-      if (!text.includes(q.name)) fail(`${rel}: FAQPage の質問が本文に無い: ${q.name}`);
-      const a = q.acceptedAnswer?.text ?? "";
-      if (!a || !text.includes(a)) fail(`${rel}: FAQPage の回答が本文に無い: ${a.slice(0, 40)}…`);
-    }
-  }
-  if (crumbs) {
-    const list = crumbs.itemListElement ?? [];
-    const last = list[list.length - 1];
-    if (!last || last.item !== SWATCH_URL) fail(`${rel}: パンくずの末尾が ${SWATCH_URL} でない`);
-    if (!list[0] || list[0].item !== SITE_URL) fail(`${rel}: パンくずの先頭が ${SITE_URL} でない`);
-  }
+  const blocks = checkFaqAndCrumbs(rel, html, text, { pageUrl: SWATCH_URL, min: 3, max: 4 });
   const eq = findPer10Errors(text);
   if (eq.found < 2) fail(`${rel}: 本文の換算式が ${eq.found} 件しか見つからない`);
   for (const e of eq.errors) fail(`${rel}: 換算式の食い違い ${e}`);
 
-  const marks = [...html.matchAll(/<(\w+)\b[^>]*\sdata-per10="([\d.]+),([\d.]+)"[^>]*>(.*?)<\/\1>/gs)];
-  if (marks.length < 2) fail(`${rel}: 実例の換算結果（data-per10）が ${marks.length} 件`);
-  for (const m of marks) {
-    const r = per10cmResult(Number(m[2]), Number(m[3]));
-    const expected = r ? per10cmText(r) : "";
-    const shown = textOf(m[4]);
-    if (shown !== expected) fail(`${rel}: ${m[2]}÷${m[3]}×10 の表示が「${shown}」（期待 ${expected}）`);
-  }
-  // 換算部品: 空状態で出力欄が描画され、入力欄にラベルが付いている
-  for (const id of ["sw-st", "sw-row"]) {
-    if (!new RegExp(`<input[^>]*id="${id}-count"`).test(html)) fail(`${rel}: 入力欄 ${id}-count が無い`);
-    if (!new RegExp(`<label[^>]*for="${id}-length"`).test(html)) fail(`${rel}: ${id}-length のラベルが無い`);
-    if (!new RegExp(`class="[^"]*\\bis-empty\\b[^"]*"[^>]*data-testid="${id}-result"`).test(html)) {
-      fail(`${rel}: 換算部品 ${id} の空状態が描画されていない`);
+  // 実例の行: data-per10（数えた数,長さ）の表示値・＝/≈・ラベル「◯cmで◯目」が関数と一致するか
+  const rows = [...html.matchAll(/<div class="swatch-ex__row">(.*?)<\/div>/gs)].map((m) => m[1]);
+  if (rows.length < 2) fail(`${rel}: 実例の行が ${rows.length} 件`);
+  for (const row of rows) {
+    const mark = row.match(/<b\b([^>]*\sdata-per10="([\d.]+),([\d.]+)"[^>]*)>(.*?)<\/b>/s);
+    if (!mark) {
+      fail(`${rel}: 実例の行に換算結果（data-per10）が無い`);
+      continue;
     }
+    const [, , count, len, inner] = mark;
+    const r = per10cmResult(Number(count), Number(len));
+    if (!r) {
+      fail(`${rel}: 実例 ${count}÷${len} は換算できない入力`);
+      continue;
+    }
+    const shown = textOf(inner);
+    if (shown !== per10cmText(r)) fail(`${rel}: ${count}÷${len}×10 の表示が「${shown}」（期待 ${per10cmText(r)}）`);
+    const line = textOf(row.match(/<p class="calc-line[^"]*">(.*?)<\/p>/s)?.[1] ?? "").replace(/\s+/g, "");
+    const parts = per10cmParts(r);
+    if (!line.startsWith(`${count}÷${len}×10${parts.relation}`)) {
+      fail(`${rel}: 実例の式「${line}」が「${count}÷${len}×10${parts.relation}…」で始まらない（＝/≈ または入力の取り違え）`);
+    }
+    const label = textOf(row.match(/<p class="swatch-ex__label">(.*?)<\/p>/s)?.[1] ?? "");
+    const lm = label.match(/（([\d.]+)cmで([\d.]+)([目段])）/);
+    const unit = line.match(/([目段])$/)?.[1];
+    if (!lm || lm[1] !== len || lm[2] !== count || lm[3] !== unit) {
+      fail(`${rel}: 実例のラベル「${label}」が data-per10=${count},${len}・単位 ${unit} と合わない`);
+    }
+  }
+
+  // 換算部品: 空状態の出力欄が描画され、入力欄にラベルが付いている
+  const idsOfTag = (name) => tags(html, name);
+  for (const id of ["sw-st", "sw-row"]) {
+    if (!idsOfTag("input").some((a) => a.id === `${id}-count`)) fail(`${rel}: 入力欄 ${id}-count が無い`);
+    if (!idsOfTag("input").some((a) => a.id === `${id}-length`)) fail(`${rel}: 入力欄 ${id}-length が無い`);
+    if (!idsOfTag("label").some((a) => a.for === `${id}-length`)) fail(`${rel}: ${id}-length のラベルが無い`);
+    const out = idsOfTag("div").find((a) => a["data-testid"] === `${id}-result`);
+    if (!out || !hasClass(out, "is-empty")) fail(`${rel}: 換算部品 ${id} の空状態が描画されていない`);
   }
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
   if (!html.includes(`href="${BASE_PATH}/"`)) fail(`${rel}: トップへの導線が無い`);
-  // 無料のまま: 有料・課金・書き出しの語を出さない
-  if (/有料|課金|書き出し|エクスポート|サブスク/.test(text)) fail(`${rel}: 有料機能を示す語が本文にある`);
+  checkNoPaidTerms(rel, html, text, blocks);
 }
 
 function checkTopPage(rel, html) {
