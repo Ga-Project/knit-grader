@@ -4,13 +4,18 @@
 /** re のグローバル一致をすべて返す。re の lastIndex には触らない（コピーで走査する）。 */
 export function allMatches(re: RegExp, text: string): RegExpExecArray[] {
   const flags = re.flags.includes("g") ? re.flags : `${re.flags}g`;
+  const unicode = re.flags.includes("u") || re.flags.includes("v");
   const copy = new RegExp(re.source, flags);
   const out: RegExpExecArray[] = [];
   let m: RegExpExecArray | null = copy.exec(text);
   while (m !== null) {
     out.push(m);
-    // 空文字列に一致する正規表現でも無限ループにしない
-    if (m[0] === "") copy.lastIndex += 1;
+    // 空文字列に一致する正規表現でも必ず進む（無限ループにしない）。
+    // u フラグ付きでは lastIndex が UTF-16 の位置なので、サロゲートペアの途中へ進まないよう code point 単位で進める。
+    if (m[0] === "") {
+      const cp = unicode ? text.codePointAt(copy.lastIndex) : undefined;
+      copy.lastIndex += cp !== undefined && cp > 0xffff ? 2 : 1;
+    }
     m = copy.exec(text);
   }
   return out;

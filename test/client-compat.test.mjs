@@ -61,13 +61,28 @@ test("String.prototype.matchAll などの新しい API を削除しても、ク�
   assert.equal(out.count, 62);
 });
 
-test("matchAll を使うコードが lib に残っていない（Chrome 67 の bundle で TypeError にならない）", async () => {
-  const { readdirSync, readFileSync } = await import("node:fs");
-  for (const f of readdirSync(new URL("../lib/", import.meta.url))) {
-    const src = readFileSync(new URL(`../lib/${f}`, import.meta.url), "utf8")
+test("クライアントの bundle に入る lib と app のソースに、対応ブラウザの下限にない API を使うコードが無い", async () => {
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const files = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (/\.(ts|tsx)$/.test(name)) files.push(path);
+    }
+  };
+  walk(fileURLToPath(new URL("../lib/", import.meta.url)));
+  walk(fileURLToPath(new URL("../app/", import.meta.url)));
+  assert.ok(files.length > 20, `${files.length} files`);
+  // matchAll=Chrome 73、replaceAll=85、at=92、flat/flatMap=69、Object.fromEntries=73、Object.hasOwn=93、
+  // trimStart/trimEnd=66（Safari 12）、findLast=97、structuredClone=98
+  const forbidden = /\.matchAll\(|\.replaceAll\(|\.at\(|\.flat\(|\.flatMap\(|Object\.fromEntries|Object\.hasOwn\b|\.trimStart\(|\.trimEnd\(|\.findLast\(|\.findLastIndex\(|structuredClone/;
+  for (const f of files) {
+    const src = readFileSync(f, "utf8")
       .split("\n")
       .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/*"))
       .join("\n");
-    assert.ok(!/\.matchAll\(|\.replaceAll\(|\.flatMap\(|Object\.fromEntries|\.findLast\(/.test(src), f);
+    assert.ok(!forbidden.test(src), f);
   }
 });
