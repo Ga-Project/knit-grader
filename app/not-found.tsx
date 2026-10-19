@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader, SiteFooter } from "./chrome";
+import { Phrased } from "./Phrased";
 
 export const metadata: Metadata = {
   title: "ページが見つかりません — ニットゲージ計算",
@@ -24,12 +25,13 @@ export default function NotFound() {
           <div className="container container-narrow">
             <span className="badge badge-accent">404</span>
             <h1 style={{ marginTop: "var(--sp-4)" }}>
-              ページが<span className="accent-text">見つかりません</span>
+              <Phrased text="ページが" />
+              <span className="accent-text">
+                <Phrased text="見つかりません" />
+              </span>
             </h1>
             <p className="hero-lead">
-              {
-                "お探しのページは見つかりませんでした。移動・削除されたか、URL が誤っている可能性があります。"
-              }
+              <Phrased text="お探しのページは見つかりませんでした。移動・削除されたか、URL が誤っている可能性があります。" />
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">

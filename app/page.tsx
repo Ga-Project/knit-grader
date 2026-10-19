@@ -8,6 +8,8 @@ import { HOME_TITLE, HOME_DESCRIPTION } from "./config";
 import { pageMetadata } from "./seo";
 import { GaugeTool } from "./GaugeTool";
 import { SiteHeader, SiteFooter } from "./chrome";
+import { Phrased } from "./Phrased";
+import { FaqList } from "./Faq";
 import { StitchMark } from "./StitchMark";
 
 export const metadata: Metadata = pageMetadata({
@@ -93,19 +95,21 @@ export default function Home() {
           <div className="container">
             <span className="eyebrow">編み物のための計算ツール</span>
             <h1>
-              ゲージが合わなくても、
-              <span className="accent-text">目数と段数がすぐ決まる。</span>
+              <Phrased text="ゲージが合わなくても、" />
+              <span className="accent-text">
+                <Phrased text="目数と段数がすぐ決まる。" />
+              </span>
             </h1>
             <p className="hero-lead">
-              {
-                "10cm角のゲージと仕上がり寸法を入れるだけ。必要な目数・段数をその場で同時に計算します。入力は自動保存で消えず、あとから何度でも編集できます。"
-              }
+              <Phrased text="10cm角のゲージと仕上がり寸法を入れるだけ。必要な目数・段数をその場で同時に計算します。入力は自動保存で消えず、あとから何度でも編集できます。" />
             </p>
             <ul className="promise-row">
               {promises.map((p) => (
                 <li key={p}>
                   <StitchMark size={16} />
-                  {p}
+                  <span>
+                    <Phrased text={p} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -118,17 +122,19 @@ export default function Home() {
         <section className="trust-points" aria-labelledby="trust-heading">
           <div className="container">
             <span className="eyebrow">選ばれる理由</span>
-            <h2 id="trust-heading" style={{ marginTop: "var(--sp-2)" }}>
-              計算より、消えないことと後編集
-            </h2>
+            <h2 id="trust-heading" style={{ marginTop: "var(--sp-2)" }}><Phrased text="計算より、消えないことと後編集" /></h2>
             <div className="trust-grid">
               {trust.map((t) => (
                 <article className="card" key={t.title}>
                   <span className="card-icon" aria-hidden="true">
                     <StitchMark size={22} />
                   </span>
-                  <h3>{t.title}</h3>
-                  <p>{t.body}</p>
+                  <h3>
+                    <Phrased text={t.title} />
+                  </h3>
+                  <p>
+                    {t.body}
+                  </p>
                 </article>
               ))}
             </div>
@@ -139,17 +145,19 @@ export default function Home() {
         <section className="step-list" aria-labelledby="steps-heading">
           <div className="container">
             <span className="eyebrow">使い方</span>
-            <h2 id="steps-heading" style={{ marginTop: "var(--sp-2)" }}>
-              3ステップで、目数・段数まで
-            </h2>
+            <h2 id="steps-heading" style={{ marginTop: "var(--sp-2)" }}><Phrased text="3ステップで、目数・段数まで" /></h2>
             <div className="steps">
               {steps.map((s, i) => (
                 <div className="step" key={s.title}>
                   <span className="step__no" aria-hidden="true">
                     {i + 1}
                   </span>
-                  <h3>{s.title}</h3>
-                  <p>{s.body}</p>
+                  <h3>
+                    <Phrased text={s.title} />
+                  </h3>
+                  <p>
+                    {s.body}
+                  </p>
                 </div>
               ))}
             </div>
@@ -160,17 +168,8 @@ export default function Home() {
         <section className="faq" aria-labelledby="faq-heading">
           <div className="container container-narrow">
             <span className="eyebrow">はじめる前に</span>
-            <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}>
-              よくある質問
-            </h2>
-            <div className="faq__list">
-              {faqs.map((f) => (
-                <details className="faq__item" key={f.q}>
-                  <summary>{f.q}</summary>
-                  <div className="faq__body">{f.a}</div>
-                </details>
-              ))}
-            </div>
+            <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}><Phrased text="よくある質問" /></h2>
+            <FaqList faqs={faqs} />
             <p className="faq__more">
               <Link href={GAUGE_GUIDE_PATH}>
                 ゲージから目数・段数を出す方法（計算式と早見表）

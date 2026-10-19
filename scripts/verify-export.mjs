@@ -29,6 +29,7 @@ import { SITE_URL, OG_IMAGE_URL, GOATCOUNTER_CODE } from "../app/config.ts";
 import { countForLength } from "../lib/grading.ts";
 import { findEquationErrors, finishedCm } from "../lib/calc-text.ts";
 import { GAUGE_GUIDE_PATH } from "../lib/gauge-guide.ts";
+import { isValidPhraseBoundary } from "../lib/phrases.ts";
 import {
   findFaqIntegerErrors,
   findIntegerClaimErrors,
@@ -398,8 +399,7 @@ function checkFaqAndCrumbs(rel, html, text, { pageUrl, min, max }) {
 
 function checkGaugePage(rel, html) {
   const text = visibleText(html);
-  const blocks = checkFaqAndCrumbs(rel, html, text, { pageUrl: GAUGE_URL, min: 3, max: 5 });
-  checkNoPaidTerms(rel, html, text, blocks);
+  checkFaqAndCrumbs(rel, html, text, { pageUrl: GAUGE_URL, min: 3, max: 5 });
 
   // 本文中の計算式（「＝」「≈」「四捨五入して」の主張）が計算結果と一致するか
   const eq = findEquationErrors(text);
@@ -420,7 +420,7 @@ function checkGaugePage(rel, html) {
 function checkFinishedClaims(rel, html) {
   const body = stripNonContent(html).replace(/<details\b.*?<\/details>/gs, "");
   const claims = [
-    ...body.matchAll(/([\d.]+cm)((?:<\/span>)?)(?:<!--.*?-->)*(、丈は|に仕上がり|になり)/g),
+    ...body.matchAll(/([\d.]+cm)((?:<\/span>)?)(?:<!--.*?-->|<span class="nowrap">)*(、丈は|に仕上がり|になり)/g),
   ];
   if (claims.length === 0) fail(`${rel}: 仕上がり寸法の記述が見つからない`);
   for (const m of claims) {
@@ -495,21 +495,77 @@ function checkMarkers(rel, html) {
 }
 
 /** 有料機能・課金・書き出しを示す語（無料のままであることの検査）。 */
-const PAID_TERMS = /有料|課金|書き出し|エクスポート|サブスク|プレミアム|Pro版/;
+const PAID_TERMS = /有料|課金|書き出し|エクスポート|サブスク|プレミアム|Pro版|料金|プラン|月額|年額|購入|決済|ライセンス/;
 
-/** 本文・meta（description/og/twitter）・JSON-LD のいずれにも有料機能を示す語が無いこと。 */
-function checkNoPaidTerms(rel, html, text, blocks) {
+/**
+ * 全ページ: 本文・meta（description/og/twitter）・JSON-LD・読み上げ/表示用の属性（alt/aria-label/title/placeholder）の
+ * いずれにも有料機能を示す語が無いこと。
+ */
+function checkNoPaidTerms(rel, html) {
+  const blocks = [...html.matchAll(/<script\s+type="application\/ld\+json"[^>]*>(.*?)<\/script>/gs)].map((m) => m[1]);
   const metaTexts = tags(html, "meta")
     .filter((a) => /^(description|og:|twitter:)/.test(a.name ?? a.property ?? ""))
     .map((a) => a.content ?? "");
+  const attrTexts = [];
+  for (const m of html.matchAll(/<(\w+)\b([^>]*)>/g)) {
+    const attrs = parseAttrs(m[2]);
+    for (const name of ["alt", "aria-label", "title", "placeholder"]) {
+      if (attrs[name]) attrTexts.push(attrs[name]);
+    }
+  }
   const sources = [
-    ["本文", text],
+    ["本文", visibleText(html)],
     ["meta", metaTexts.join("\n")],
-    ["JSON-LD", JSON.stringify(blocks)],
+    ["JSON-LD", blocks.join("\n")],
+    ["属性(alt/aria-label/title/placeholder)", attrTexts.join("\n")],
   ];
   for (const [where, value] of sources) {
     const m = value.match(PAID_TERMS);
     if (m) fail(`${rel}: ${where}に有料機能を示す語「${m[0]}」がある`);
+  }
+}
+
+/**
+ * 隣り合う Phrased の片（<span class="phrase">）の境界が、折り返してよい位置（lib/phrases.ts の規則）か。
+ * ひらがなの後ろ（助詞でない）や、漢字・カタカナ・英数の後ろ（句読点・閉じ括弧でない）で区切っている
+ * ＝語の途中で切っているものが 1 件でもあれば失敗にする。
+ */
+function checkPhraseBoundaries(rel, html) {
+  const spans = [...html.matchAll(/<span class="phrase">([^<]*)<\/span>/g)];
+  let prev = null;
+  let checked = 0;
+  for (const m of spans) {
+    const text = decodeEntities(m[1]);
+    const start = m.index;
+    if (prev && prev.end === start) {
+      checked += 1;
+      if (!isValidPhraseBoundary(prev.text, text)) {
+        fail(`${rel}: 語の途中で区切っている「${prev.text.slice(-6)}|${text.slice(0, 6)}」`);
+      }
+    }
+    prev = { text, end: start + m[0].length };
+  }
+  return checked;
+}
+
+/**
+ * 入力欄（ツールと換算部品）の静的な配線: text + decimal・autocomplete=off・初期状態は aria-invalid=false で、
+ * ラベルに結ばれている。エラー時の表示（原因別の文言・aria-describedby）はクライアントの状態で決まり
+ * 書き出した HTML には現れないため、純関数（lib/gauge-input・lib/swatch-guide・lib/grading）の単体テストで担保する。
+ */
+function checkInputs(rel, html, expectedIds) {
+  const inputs = tags(html, "input");
+  for (const id of expectedIds) {
+    const a = inputs.find((x) => x.id === id);
+    if (!a) {
+      fail(`${rel}: 入力欄 ${id} が無い`);
+      continue;
+    }
+    if (a.type !== "text") fail(`${rel}: 入力欄 ${id} が type=text でない（${a.type}）`);
+    if (a.inputmode !== "decimal") fail(`${rel}: 入力欄 ${id} が inputmode=decimal でない`);
+    if (a.autocomplete !== "off") fail(`${rel}: 入力欄 ${id} が autocomplete=off でない`);
+    if (a["aria-invalid"] !== "false") fail(`${rel}: 入力欄 ${id} の初期 aria-invalid が false でない`);
+    if (!tags(html, "label").some((l) => l.for === id)) fail(`${rel}: 入力欄 ${id} のラベルが無い`);
   }
 }
 
@@ -583,7 +639,7 @@ function checkSwatchPage(rel, html) {
   }
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
   if (!html.includes(`href="${BASE_PATH}/"`)) fail(`${rel}: トップへの導線が無い`);
-  checkNoPaidTerms(rel, html, text, blocks);
+  checkInputs(rel, html, ["sw-st-count", "sw-st-length", "sw-row-count", "sw-row-length"]);
 }
 
 function checkTopPage(rel, html) {
@@ -595,7 +651,7 @@ function checkTopPage(rel, html) {
   if (!topBlocks.some((b) => b["@type"] === "SoftwareApplication")) {
     fail(`${rel}: SoftwareApplication JSON-LD が無い`);
   }
-  checkNoPaidTerms(rel, html, visibleText(html), topBlocks);
+  checkInputs(rel, html, ["g-st", "g-row", "w", "l"]);
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) {
     fail(`${rel}: /gauge/ への導線（href="${BASE_PATH}${GAUGE_GUIDE_PATH}"）が無い`);
   }
@@ -621,7 +677,12 @@ function main() {
   if (!locs.includes(SWATCH_URL)) fail(`sitemap.xml: ${SWATCH_URL} が無い`);
   if (new Set(locs).size !== locs.length) fail("sitemap.xml: URL が重複している");
 
-  for (const rel of files) checkCommon(rel, readFileSync(join(OUT_DIR, rel), "utf8"));
+  for (const rel of files) {
+    const html = readFileSync(join(OUT_DIR, rel), "utf8");
+    checkCommon(rel, html);
+    checkNoPaidTerms(rel, html);
+    checkPhraseBoundaries(rel, html);
+  }
 
   for (const loc of locs) {
     const rel = byUrl.get(loc);

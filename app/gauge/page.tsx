@@ -6,6 +6,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader, SiteFooter } from "../chrome";
+import { Phrased } from "../Phrased";
+import { FaqList } from "../Faq";
 import { SITE_URL } from "../config";
 import { absoluteUrl, pageMetadata } from "../seo";
 import {
@@ -138,11 +140,11 @@ export default function GaugeGuide() {
               </ol>
             </nav>
             <span className="eyebrow">ゲージの使い方</span>
-            <h1>{PAGE_NAME}</h1>
+            <h1>
+              <Phrased text={PAGE_NAME} />
+            </h1>
             <p className="hero-lead">
-              {
-                "試し編みの10cm角に入る目数と段数（ゲージ）が分かれば、編みたい幅と丈に必要な目数・段数は割り算と掛け算で決まります。計算式と実例、早見表、ゲージが指定と合わないときの出し直し方をまとめました。"
-              }
+              <Phrased text="試し編みの10cm角に入る目数と段数（ゲージ）が分かれば、編みたい幅と丈に必要な目数・段数は割り算と掛け算で決まります。計算式と実例、早見表、ゲージが指定と合わないときの出し直し方をまとめました。" />
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">
@@ -155,16 +157,12 @@ export default function GaugeGuide() {
         <section className="guide-section" aria-labelledby="idea-heading">
           <div className="container container-narrow">
             <span className="eyebrow">考え方</span>
-            <h2 id="idea-heading">ゲージは「1cmに何目入るか」の手がかり</h2>
+            <h2 id="idea-heading"><Phrased text="ゲージは「1cmに何目入るか」の手がかり" /></h2>
             <p>
-              {
-                "ゲージは、試し編みの10cm四方に入る目数（横）と段数（縦）です。10cmあたりの目数が分かれば、1cmあたりに入る目数も分かります。あとは編みたい幅が何cmあるかを掛け合わせれば、必要な目数が決まります。段数も同じで、丈（縦の長さ）と10cmあたりの段数から求めます。"
-              }
+              {"ゲージは、試し編みの10cm四方に入る目数（横）と段数（縦）です。10cmあたりの目数が分かれば、1cmあたりに入る目数も分かります。あとは編みたい幅が何cmあるかを掛け合わせれば、必要な目数が決まります。段数も同じで、丈（縦の長さ）と10cmあたりの段数から求めます。"}
             </p>
             <p>
-              {
-                "同じ糸・同じ針でも編む人や編み方で目の大きさは変わるため、編み図の数字をそのまま使う前に、自分の試し編みを測ってゲージを確かめるのが確実です。"
-              }
+              {"同じ糸・同じ針でも編む人や編み方で目の大きさは変わるため、編み図の数字をそのまま使う前に、自分の試し編みを測ってゲージを確かめるのが確実です。"}
             </p>
             <p className="faq__more">
               <Link href={SWATCH_GUIDE_PATH}>ゲージの測り方（スワッチの編み方と数え方）</Link>
@@ -175,7 +173,7 @@ export default function GaugeGuide() {
         <section className="guide-section" aria-labelledby="formula-heading">
           <div className="container container-narrow">
             <span className="eyebrow">計算式</span>
-            <h2 id="formula-heading">計算式と実例</h2>
+            <h2 id="formula-heading"><Phrased text="計算式と実例" /></h2>
             <div className="formula-box">
               <Formula result="目数" length="幅（cm）" per="10cmあたりの目数" />
               <Formula result="段数" length="丈（cm）" per="10cmあたりの段数" />
@@ -217,11 +215,9 @@ export default function GaugeGuide() {
         <section className="guide-section" aria-labelledby="chart-heading">
           <div className="container container-narrow">
             <span className="eyebrow">早見表</span>
-            <h2 id="chart-heading">10cmあたりの目数と幅から見る早見表</h2>
+            <h2 id="chart-heading"><Phrased text="10cmあたりの目数と幅から見る早見表" /></h2>
             <p>
-              {
-                "左の列が10cmあたりの目数、上の行が幅です。交わるところが必要な目数で、割り切れないときは四捨五入しています。段数を見るときは「目」を「段」、幅を丈と読み替えてください。"
-              }
+              {"左の列が10cmあたりの目数、上の行が幅です。交わるところが必要な目数で、割り切れないときは四捨五入しています。段数を見るときは「目」を「段」、幅を丈と読み替えてください。"}
             </p>
             <QuickChart chart={chart} />
           </div>
@@ -230,11 +226,9 @@ export default function GaugeGuide() {
         <section className="guide-section" aria-labelledby="mismatch-heading">
           <div className="container container-narrow">
             <span className="eyebrow">ゲージが合わないとき</span>
-            <h2 id="mismatch-heading">自分のゲージが指定と違うとき</h2>
+            <h2 id="mismatch-heading"><Phrased text="自分のゲージが指定と違うとき" /></h2>
             <p>
-              {
-                "編み図の目数・段数は、その編み図が指定するゲージで編んだときの数です。自分のゲージが指定と違うまま同じ目数・段数で編むと、仕上がり寸法が変わります。自分のゲージで目数・段数を出し直せば、ほぼ指定どおりの寸法に仕上がります。"
-              }
+              {"編み図の目数・段数は、その編み図が指定するゲージで編んだときの数です。自分のゲージが指定と違うまま同じ目数・段数で編むと、仕上がり寸法が変わります。自分のゲージで目数・段数を出し直せば、ほぼ指定どおりの寸法に仕上がります。"}
             </p>
 
             <div className="table-wrap">
@@ -277,21 +271,20 @@ export default function GaugeGuide() {
             <p>
               {`指定の${m.pattern.stitches.count}目・${m.pattern.rows.count}段のまま自分のゲージで編むと、幅は`}
               <Len f={m.asIs.width} />
-              {"、丈は"}
+              <span className="nowrap">、丈は</span>
               <Len f={m.asIs.length} />
-              {`になります。自分のゲージで出し直した${m.mine.stitches.count}目・${m.mine.rows.count}段で編めば、幅は`}
+              <span className="nowrap">になります。</span>
+              {`自分のゲージで出し直した${m.mine.stitches.count}目・${m.mine.rows.count}段で編めば、幅は`}
               <Len f={m.redone.width} />
-              {"、丈は"}
+              <span className="nowrap">、丈は</span>
               <Len f={m.redone.length} />
-              {"に仕上がります。"}
+              <span className="nowrap">に仕上がります。</span>
               {m.redoneMatchesTarget
                 ? ""
                 : "指定の寸法とのわずかな差は、目数・段数を四捨五入した端数のぶんです。"}
             </p>
             <p>
-              {
-                "ただし出し直しで保てるのは寸法で、編み地の詰まり具合は指定とは変わります。針や糸を替えてゲージを指定に近づける方法もあります。どちらを優先するかは作品に合わせて決めてください。"
-              }
+              {"ただし出し直しで保てるのは寸法で、編み地の詰まり具合は指定とは変わります。針や糸を替えてゲージを指定に近づける方法もあります。どちらを優先するかは作品に合わせて決めてください。"}
             </p>
           </div>
         </section>
@@ -299,27 +292,16 @@ export default function GaugeGuide() {
         <section className="faq" aria-labelledby="faq-heading">
           <div className="container container-narrow">
             <span className="eyebrow">よくある質問</span>
-            <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}>
-              ゲージと目数計算のよくある質問
-            </h2>
-            <div className="faq__list">
-              {faqs.map((f) => (
-                <details className="faq__item" key={f.q}>
-                  <summary>{f.q}</summary>
-                  <div className="faq__body">{f.a}</div>
-                </details>
-              ))}
-            </div>
+            <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}><Phrased text="ゲージと目数計算のよくある質問" /></h2>
+            <FaqList faqs={faqs} />
           </div>
         </section>
 
         <section className="guide-section guide-cta" aria-labelledby="cta-heading">
           <div className="container container-narrow">
-            <h2 id="cta-heading">自分のゲージで計算する</h2>
+            <h2 id="cta-heading"><Phrased text="自分のゲージで計算する" /></h2>
             <p>
-              {
-                "計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。"
-              }
+              {"計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。"}
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">

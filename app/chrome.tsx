@@ -31,10 +31,10 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
     <footer className="site-footer">
       <div className="container">
         <p>
-          目数・段数は入力したゲージから算出した目安です。実際の製作では試し編みで再確認してください。
+          {"目数・段数は入力したゲージから算出した目安です。実際の製作では試し編みで再確認してください。"}
         </p>
         <p style={{ marginTop: "var(--sp-2)" }}>
-          入力した内容はお使いのブラウザ内にのみ保存され、サーバーへ送信されません。
+          {"入力した内容はお使いのブラウザ内にのみ保存され、サーバーへ送信されません。"}
         </p>
         <ul className="footer-links">
           <li>

@@ -113,6 +113,14 @@
   font-size: var(--fs-sm);
   color: var(--text);
 }
+/* 狭い画面では見出しとヒントを縦積みにする（横並びのまま語の途中で割れない） */
+@media (max-width: 420px) {
+  .ws-panel__legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+}
 .ws-panel__legend small {
   font-weight: var(--fw-medium);
   color: var(--text-dim);
@@ -835,12 +843,12 @@
 /* hero: 左に見出し、右に完成した 10cm 角のスワッチ図。狭い画面では縦積み */
 .swatch-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 13rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 14rem);
   gap: var(--sp-6);
   align-items: center;
 }
 .swatch-hero__fig {
-  max-width: 13rem;
+  max-width: 14rem;
 }
 @media (max-width: 760px) {
   .swatch-hero {
@@ -852,18 +860,43 @@
   }
 }
 
-/* 和文は語の途中で折り返さない（対応ブラウザでは文節で折る。未対応ブラウザは nowrap で区切った箇所で折る）。
-   見出し・リード・本文・FAQ の質問と回答すべてに掛ける（全ページ共通）。 */
-.section-plan__text h3,
-.guide-section h2,
-.hero-lead,
-.guide-section p,
-.faq__item summary,
-.faq__body {
+/* Phrased（app/Phrased.tsx）の塊: 行の途中では分割せず、行幅より長い塊だけは中で折り返す */
+.phrase {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+
+/* 本文が狭い容器のページも、左端はヘッダー・トップと同じ位置にそろえる（中央寄せにしない）。
+   幅は読みやすい 44rem のまま。ブランドの位置がページ間で動かず、ヘッダーと本文の左端が一致する。 */
+.container-narrow {
+  margin-left: max(0px, calc((100% - var(--container)) / 2));
+  margin-right: auto;
+}
+
+/* 404 の大見出し: 狭い画面でも「見つかりません」が語の途中で折れない大きさにする */
+.hero h1 {
+  font-size: clamp(1.75rem, 8.2vw, var(--fs-3xl));
+}
+
+/* 入力欄の枠は、背景に対して 3:1 以上（非テキストのコントラスト）。light/dark とも表の罫と同じトークン */
+input[type="text"] {
+  border-color: var(--table-rule);
+}
+input[type="text"]:hover:not(:focus) {
+  border-color: var(--text-soft);
+}
+
+/* 和文は語の途中で折り返さない。word-break は継承されるので、全ページの文字要素に body で一括して掛ける
+   （対応ブラウザ＝Chrome 系では文節で折れる）。仕様判断として、長文の本文・FAQ の回答・リンク文言・表の題は
+   これに任せ、Safari・Firefox など未対応のブラウザでは標準の和文折り返しを許容する（文節の手書き区切りは
+   語の途中の切れが構造的に残るため行わない）。見出し・リード・ヒント・FAQ の質問・ラベルなどの短い UI 文字列だけ
+   app/Phrased.tsx が、助詞・句読点・括弧・空白の後ろでだけ折れる塊（.phrase）にする。 */
+body {
   word-break: auto-phrase;
 }
 
-/* 換算部品: 入力2つ＋結果。結果は空・入力不正でも高さが跳ねないよう最低高さを持つ */
+/* 換算部品: 入力2つ＋結果。結果欄は空・エラー・結果のどれでも同じ高さ */
 .swatch-calc {
   margin-top: var(--sp-5);
   display: grid;
@@ -884,7 +917,8 @@
   font-size: var(--fs-base);
 }
 .swatch-calc__out {
-  min-height: 6.5rem;
+  /* 結果が最大（8桁ずつの入力・注記が2行・320px幅）でも収まる高さに固定し、状態が変わっても下が動かない */
+  min-height: 8.5rem;
   border-left: 3px solid var(--accent);
   padding-left: var(--sp-4);
 }
@@ -899,6 +933,7 @@
 }
 .swatch-calc__num {
   margin: 0;
+  line-height: 1.25;
   font-family: var(--font-mono);
   color: var(--text-soft);
   font-weight: var(--fw-semibold);
@@ -910,16 +945,25 @@
   color: var(--text);
 }
 .swatch-calc__label {
+  display: block;
   font-family: var(--font-sans);
   font-size: var(--fs-xs);
   color: var(--accent);
   letter-spacing: var(--tracking-wide);
 }
+/* 「約208.3目」は 1 かたまり（「約」だけが行頭・行末に孤立しない） */
+.swatch-calc__figure {
+  white-space: nowrap;
+}
 .swatch-calc__calc {
   margin: var(--sp-1) 0 0;
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  /* 入力は最大 8 文字ずつなので、320px 幅でも 1 行に収まる大きさにする（折り返すと結果欄が伸びる） */
+  font-size: clamp(0.7rem, 3.3vw, 0.875rem);
   color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .swatch-calc__note,
 .swatch-calc__hint {

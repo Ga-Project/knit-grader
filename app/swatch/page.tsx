@@ -4,6 +4,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader, SiteFooter } from "../chrome";
+import { FaqList } from "../Faq";
+import { Phrased } from "../Phrased";
 import { SITE_URL } from "../config";
 import { absoluteUrl, pageMetadata } from "../seo";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
@@ -70,7 +72,7 @@ function ExampleLine({ r, unit, label }: { r: Per10cmResult; unit: string; label
   const p = per10cmParts(r);
   return (
     <div className="swatch-ex__row">
-      <p className="swatch-ex__label">{`${label}（${r.lengthCm}cmで${r.count}${unit}）`}</p>
+      <p className="swatch-ex__label"><Phrased text={`${label}（${r.lengthCm}cmで${r.count}${unit}）`} /></p>
       <p className="calc-line tabular">
         <span className="nowrap">{p.expression}</span>{" "}
         <span className="nowrap">
@@ -79,7 +81,9 @@ function ExampleLine({ r, unit, label }: { r: Per10cmResult; unit: string; label
           {unit}
         </span>
       </p>
-      <p className="swatch-ex__note">{integerNote(r, unit)}</p>
+      <p className="swatch-ex__note">
+        <Phrased text={integerNote(r, unit)} />
+      </p>
     </div>
   );
 }
@@ -114,16 +118,11 @@ export default function SwatchGuide() {
               </ol>
             </nav>
             <span className="eyebrow">ゲージの使い方</span>
-            <h1>{PAGE_NAME}</h1>
+            <h1>
+              <Phrased text={PAGE_NAME} />
+            </h1>
             <p className="hero-lead">
-              {"ゲージは、"}
-              <span className="nowrap">試し編み（スワッチ）</span>
-              {"の10cm四方に入る目数と段数です。"}
-              <span className="nowrap">編んで、</span>
-              <span className="nowrap">洗って乾かして、</span>
-              <span className="nowrap">中央で数え、</span>
-              <span className="nowrap">10cmあたりに換算する。</span>
-              {"この4つの手順で測れます。"}
+              <Phrased text="ゲージは、試し編み（スワッチ）の10cm四方に入る目数と段数です。編んで、洗って乾かして、中央で数え、10cmあたりに換算する。この4つの手順で測れます。" />
             </p>
             <div className="hero-actions">
               <a className="btn btn-primary" href="#calc">
@@ -154,7 +153,9 @@ export default function SwatchGuide() {
                     <SwatchFigure kind={s.kind} />
                   </div>
                   <div className="section-plan__text">
-                    <h3>{s.title}</h3>
+                    <h3>
+                      <Phrased text={s.title} />
+                    </h3>
                     <p>{s.body}</p>
                   </div>
                 </li>
@@ -171,9 +172,7 @@ export default function SwatchGuide() {
               <span className="nowrap">10cmあたりを出す</span>
             </h2>
             <p>
-              {
-                "数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、小数第1位で表しきれないときは「約」を付けます。整数のゲージとして使うときは四捨五入した値も示します。"
-              }
+              {"数えた目数（または段数）と、測った長さを入れると、10cmあたりに換算します。表示は小数第1位までで、小数第1位で表しきれないときは「約」を付けます。整数のゲージとして使うときは四捨五入した値も示します。"}
             </p>
             <SwatchCalc />
 
@@ -183,9 +182,7 @@ export default function SwatchGuide() {
               <ExampleLine r={example.rows} unit="段" label="段数" />
             </div>
             <p>
-              {
-                "出した10cmあたりの値は、小数のままでも、整数に丸めた値でも、計算ツールのゲージに入力できます。"
-              }
+              {"出した10cmあたりの値は、小数のままでも、整数に丸めた値でも、計算ツールのゲージに入力できます。"}
             </p>
             <p className="faq__more">
               <Link href={GAUGE_GUIDE_PATH}>
@@ -201,14 +198,7 @@ export default function SwatchGuide() {
             <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}>
               ゲージの測り方のよくある質問
             </h2>
-            <div className="faq__list">
-              {faqs.map((f) => (
-                <details className="faq__item" key={f.q}>
-                  <summary>{f.q}</summary>
-                  <div className="faq__body">{f.a}</div>
-                </details>
-              ))}
-            </div>
+            <FaqList faqs={faqs} />
           </div>
         </section>
 
@@ -216,9 +206,7 @@ export default function SwatchGuide() {
           <div className="container container-narrow">
             <h2 id="cta-heading">測ったゲージで計算する</h2>
             <p>
-              {
-                "計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。"
-              }
+              {"計算ツールにゲージと幅・丈を入れると、目数と段数を同時に出します。入力はブラウザに自動保存され、あとから何度でも編集できます。"}
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">
