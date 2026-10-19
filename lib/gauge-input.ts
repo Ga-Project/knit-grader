@@ -68,6 +68,9 @@ export function analyzeGaugeInputs(inputs: GaugeInputs): GaugeInputState {
   };
 }
 
+/** 目数か段数が 1 未満になる組み合わせの案内（動的に出す文言。核語「ゲージ」を含むので、表示は app/Words.tsx で核語を塊にする）。 */
+export const TOO_SMALL_MESSAGE = "この組み合わせでは目数か段数が1未満になります。ゲージか寸法を見直してください";
+
 /** localStorage に保存する形（4 欄とも文字列）。 */
 export type SavedInputs = GaugeInputs;
 

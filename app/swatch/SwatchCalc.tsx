@@ -11,6 +11,7 @@ import Link from "next/link";
 import { MAX_INPUT_LENGTH, MAX_MEASURE, MIN_MEASURE } from "@/lib/grading";
 import {
   integerNote,
+  outOfRangeMessage,
   per10cmParts,
   per10cmText,
   swatchRowState,
@@ -107,7 +108,7 @@ function ConvertRow({
               })()}
             </p>
             <p className="swatch-calc__note">
-              {integerNote(state.result, unit)}
+              <Words text={integerNote(state.result, unit)} />
             </p>
           </>
         ) : state.kind === "invalid" ? (
@@ -118,7 +119,7 @@ function ConvertRow({
         ) : state.kind === "outOfRange" ? (
           <p className="field-error swatch-calc__error" id={errId}>
             <span aria-hidden="true">⚠ </span>
-            {`換算結果が${MIN_MEASURE}〜${MAX_MEASURE}の範囲に収まりません。数えた数と測った長さを見直してください`}
+            {outOfRangeMessage(MIN_MEASURE, MAX_MEASURE)}
           </p>
         ) : (
           <p className="swatch-calc__hint">

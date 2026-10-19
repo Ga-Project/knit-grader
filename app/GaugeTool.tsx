@@ -1,9 +1,10 @@
 "use client";
 
 import { Words } from "./Words";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_INPUT_LENGTH } from "@/lib/grading";
-import { analyzeGaugeInputs, restoreSaved } from "@/lib/gauge-input";
+import { TOO_SMALL_MESSAGE, analyzeGaugeInputs, restoreSaved } from "@/lib/gauge-input";
 import { STORAGE_KEY } from "./config";
 import { BigIntNote } from "./BigIntNote";
 import { Phrased } from "./Phrased";
@@ -14,6 +15,12 @@ interface Saved {
   gaugeRow: string;
   width: string;
   length: string;
+}
+
+/** 結果の桁数に応じて数字を縮める（product.css の --n）。3 桁以下は既定のまま。 */
+function numStyle(value: number | undefined): CSSProperties {
+  const digits = value === undefined ? 3 : Math.max(3, String(value).length);
+  return { ["--n" as string]: digits } as CSSProperties;
 }
 
 export function GaugeTool() {
@@ -261,7 +268,7 @@ export function GaugeTool() {
               {tooSmall && (
                 <p className="field-error" id="small-error" role="alert">
                   <span aria-hidden="true">⚠ </span>
-                  この組み合わせでは目数か段数が1未満になります。ゲージか寸法を見直してください
+                  <Words text={TOO_SMALL_MESSAGE} />
                 </p>
               )}
               <p className="field-hint" id="dims-hint">
@@ -303,14 +310,14 @@ export function GaugeTool() {
             <div className="result-pair">
               <div className={`result-figure ${custom ? "" : "is-empty"}`}>
                 <div className="result-figure__label">必要な目数</div>
-                <div className="result-figure__num">
+                <div className="result-figure__num" style={numStyle(custom?.stitches)}>
                   {custom ? custom.stitches : "—"}
                   <span className="result-figure__unit">目</span>
                 </div>
               </div>
               <div className={`result-figure ${custom ? "" : "is-empty"}`}>
                 <div className="result-figure__label">必要な段数</div>
-                <div className="result-figure__num">
+                <div className="result-figure__num" style={numStyle(custom?.rows)}>
                   {custom ? custom.rows : "—"}
                   <span className="result-figure__unit">段</span>
                 </div>

@@ -78,7 +78,7 @@
 }
 @media (max-width: 820px) {
   .workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -129,7 +129,7 @@
 /* 2 入力を横並び（目数/段数、幅/丈） */
 .field-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
 }
 .field .suffix-input {
@@ -193,12 +193,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+  min-width: 0;
 }
 
 /* 大結果: 目数／段数（等幅で桁が揺れない＝精度・安定の信号） */
 .result-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …) にしないと、列が中身（大きな桁の数字）の最小幅まで広がり、狭い画面で横にはみ出す */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
 }
 .result-figure {
@@ -208,6 +210,7 @@
   box-shadow: var(--shadow-xs);
   padding: var(--sp-5);
   text-align: center;
+  min-width: 0;
 }
 .result-figure__label {
   font-size: var(--fs-xs);
@@ -220,11 +223,21 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  font-size: clamp(2.4rem, 7vw, 3.4rem);
+  /* 桁数（--n。GaugeTool が結果の桁数を入れる。既定 3）に応じて縮め、狭い画面でも 2 列の枠に収める。
+     1 枠の幅 ≒ 50vw − 92px（余白・枠・単位ぶんを引く。1 桁 ≒ 0.64em）。820px 以下は 1 列の下に 2 列、
+     821px 以上はツール入力欄（360px）が左に付くので 50vw − 280px */
+  --n: 3;
+  font-size: clamp(1.1rem, calc((50vw - 92px) / (0.64 * var(--n))), 3.4rem);
+  overflow-wrap: anywhere;
   font-weight: var(--fw-black);
   line-height: 1.05;
   color: var(--text);
   margin-top: var(--sp-1);
+}
+@media (min-width: 821px) {
+  .result-figure__num {
+    font-size: clamp(1.1rem, calc((50vw - 280px) / (0.64 * var(--n))), 3.4rem);
+  }
 }
 .result-figure__unit {
   font-size: var(--fs-sm);
@@ -906,7 +919,10 @@ input[type="text"]:hover:not(:focus) {
    （対応ブラウザ＝Chrome 系では文節で折れる）。仕様判断として、長文の本文・FAQ の回答・リンク文言・表の題は
    これに任せ、Safari・Firefox など未対応のブラウザでは標準の和文折り返しを許容する（文節の手書き区切りは
    語の途中の切れが構造的に残るため行わない）。見出し・リード・ヒント・FAQ の質問・ラベルなどの短い UI 文字列だけ
-   app/Phrased.tsx が、助詞・句読点・括弧・空白の後ろでだけ折れる塊（.phrase）にする。 */
+   app/Phrased.tsx が、助詞・句読点・括弧・空白の後ろでだけ折れる塊（.phrase）にする。
+   動的に生成される文言（エラー・案内・結果文）は、ライブリージョン内なので文節の塊にはせず、核語だけを
+   <span class="nowrap core">（app/Words.tsx）で包む。核語以外の部分は、auto-phrase 非対応ブラウザでは
+   標準の和文折り返しを許容する（動的な文言で核語が行末で割れ得るのは、核語を Words で包まない場合だけ）。 */
 body {
   word-break: auto-phrase;
 }
@@ -933,7 +949,7 @@ body {
 }
 .swatch-calc__out {
   /* 結果欄は空・エラー・結果のどれでも同じ高さに固定する（幅ごとに、全状態の最大を実測して決めた値）。状態が変わっても下が動かない */
-  min-height: 8rem; /* 480px 未満: 最悪（8桁ずつの入力・式と注記が2行）で 123px */
+  min-height: 9rem; /* 480px 未満: 実測の最悪は 139.9px（320px 幅・8 文字ずつの入力 999.9999 / 99.99999 で式が 2 行に折れる）。340〜390px は 123px、420px 以上は 99px */
   border-left: 3px solid var(--accent);
   padding-left: var(--sp-4);
 }

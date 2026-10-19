@@ -608,6 +608,7 @@ function flattenBody(html) {
   const flat = [];
   const blockId = [];
   const blocks = []; // {id, text, cls}
+  const inlineFlex = []; // インライン style で display が flex/grid 系の要素（selector では追えない）
   let cur = root;
   let skip = 0; // visually-hidden / aria-hidden の中にいる深さ
   const stack = [];
@@ -653,6 +654,9 @@ function flattenBody(html) {
     const attrs = parseAttrs(m[3]);
     const cls = new Set((attrs.class ?? "").split(/\s+/).filter(Boolean));
     const el = { tag, cls, children: [], parent: cur, attrs };
+    if (attrs.style && /display\s*:\s*([^;]+)/i.test(attrs.style) && FLEXLIKE_DISPLAY.test(/display\s*:\s*([^;]+)/i.exec(attrs.style)[1])) {
+      inlineFlex.push(`<${tag} style="${attrs.style}">`);
+    }
     cur.children.push(el);
     const hidden = cls.has("visually-hidden") || attrs["aria-hidden"] === "true";
     if (hidden) {
@@ -672,7 +676,7 @@ function flattenBody(html) {
       skip -= 1;
     }
   }
-  return { root, text: flat.join(""), blockId, blocks };
+  return { root, text: flat.join(""), blockId, blocks, inlineFlex };
 }
 
 /**
@@ -711,26 +715,50 @@ function checkCoreWordInvariant(rel, html, flat) {
   return cores;
 }
 
-/** CSS（書き出した out/_next/static/css/*.css）から、display が flex / inline-flex / grid / inline-grid の規則の最後の複合セレクタを集める。 */
+/** display の値が、折り返さない塊を直接の子にできない（子が blockify される）レイアウトか、または値を読み取れない（var() など）か。 */
+const FLEXLIKE_DISPLAY = /flex|grid|-webkit-box|-moz-box|(?:^|\s)box(?:\s|$)|var\(/i;
+/** 検査が追えないセレクタの要素（属性・ID・全称・:is/:where/:not/:has など）。 */
+const UNPARSABLE_SELECTOR = /[\[#*]|:(?:is|where|not|has|matches|-webkit-any|-moz-any|host|global)\b/i;
+
+/**
+ * CSS（書き出した out/_next/static/css/*.css）から、display が flex / inline-flex / grid / inline-grid /
+ * -webkit-box / var() の規則の対象セレクタ（最後の複合セレクタ）を集める。
+ * fail-closed: display が上のいずれかの規則で、セレクタが解釈できない形（[属性]・#id・*・:is/:where/:not/:has など）、
+ * または display の値が var() のときは、解釈できないものとして返す（呼び出し側が失敗にする）。
+ */
 function flexSelectors() {
   const dir = join(OUT_DIR, "_next", "static", "css");
-  const out = [];
-  if (!existsSync(dir)) return out;
+  const list = [];
+  const unparsable = [];
+  if (!existsSync(dir)) return { list, unparsable };
   for (const name of readdirSync(dir)) {
     if (!name.endsWith(".css")) continue;
     const css = readFileSync(join(dir, name), "utf8").replace(/\/\*.*?\*\//gs, "");
     for (const m of css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
-      if (!/(?:^|;)\s*display\s*:\s*(?:inline-)?(?:flex|grid)\b/.test(m[2])) continue;
+      const dm = /(?:^|;)\s*display\s*:\s*([^;}]+)/i.exec(m[2]);
+      if (!dm || !FLEXLIKE_DISPLAY.test(dm[1])) continue;
       for (const sel of m[1].split(",")) {
-        if (sel.includes("::")) continue;
-        const last = sel.trim().split(/[\s>+~]+/).pop() ?? "";
+        const text = sel.trim();
+        if (text.includes("::") || text === "") continue;
+        if (/var\(/i.test(dm[1])) {
+          unparsable.push(`${text}{display:${dm[1].trim()}}（display の値を解釈できない）`);
+          continue;
+        }
+        if (UNPARSABLE_SELECTOR.test(text)) {
+          unparsable.push(`${text}{display:${dm[1].trim()}}（セレクタを解釈できない）`);
+          continue;
+        }
+        const last = text.split(/[\s>+~]+/).pop() ?? "";
         const cm = /^([a-z][a-z0-9]*)?((?:\.[\w-]+)*)(?::[\w-]+(?:\([^)]*\))?)*$/i.exec(last);
-        if (!cm || (!cm[1] && !cm[2])) continue;
-        out.push({ selector: sel.trim(), tag: (cm[1] ?? "").toLowerCase(), classes: cm[2].split(".").filter(Boolean) });
+        if (!cm || (!cm[1] && !cm[2])) {
+          unparsable.push(`${text}{display:${dm[1].trim()}}（最後の複合セレクタを解釈できない）`);
+          continue;
+        }
+        list.push({ selector: text, tag: (cm[1] ?? "").toLowerCase(), classes: cm[2].split(".").filter(Boolean) });
       }
     }
   }
-  return out;
+  return { list, unparsable };
 }
 
 /**
@@ -761,7 +789,7 @@ function checkFlexChildren(rel, root, selectors) {
  */
 function checkBigIntNote(rel, html) {
   if (!/<p class="bigint-note"/.test(html)) fail(`${rel}: BigInt 非対応の案内（bigint-note）が無い`);
-  if (!html.includes("<script>try{BigInt(0)}catch(e){document.documentElement.className+=' no-bigint'}</script>")) {
+  if (!html.includes("<script>try{BigInt(0)}catch(e){var c=document.documentElement;c.className=(c.className?c.className+' ':'')+'no-bigint'}</script>")) {
     fail(`${rel}: BigInt の判定スクリプトが無い`);
   }
   const cssDir = join(OUT_DIR, "_next", "static", "css");
@@ -898,8 +926,10 @@ function main() {
     fail("out/ が無い（pnpm build を先に実行すること）");
     return 0;
   }
-  FLEX_SELECTORS.push(...flexSelectors());
+  const flexInfo = flexSelectors();
+  FLEX_SELECTORS.push(...flexInfo.list);
   if (FLEX_SELECTORS.length === 0) fail("CSS から flex/grid の規則を読み取れない");
+  for (const u of flexInfo.unparsable) fail(`CSS: flex/grid の規則を追えない（fail-closed）: ${u}`);
   const files = listHtmlFiles(OUT_DIR).map((f) => relative(OUT_DIR, f));
   const byUrl = new Map(files.map((rel) => [urlOfFile(rel), rel]));
   const locs = readSitemapLocs();
@@ -916,6 +946,7 @@ function main() {
     const flat = flattenBody(html);
     if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
     checkFlexChildren(rel, flat.root, FLEX_SELECTORS);
+    for (const t of flat.inlineFlex) fail(`${rel}: インライン style の display が flex/grid 系（検査が追えない。class と CSS の規則にすること）: ${t}`);
   }
 
   for (const loc of locs) {

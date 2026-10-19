@@ -53,7 +53,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <script
           // BigInt を使えない環境にだけ no-bigint を付ける（計算ツールの案内を出す。app/BigIntNote.tsx）
-          dangerouslySetInnerHTML={{ __html: "try{BigInt(0)}catch(e){document.documentElement.className+=' no-bigint'}" }}
+          dangerouslySetInnerHTML={{ __html:
+              "try{BigInt(0)}catch(e){var c=document.documentElement;c.className=(c.className?c.className+' ':'')+'no-bigint'}" }}
         />
         <script
           type="application/ld+json"

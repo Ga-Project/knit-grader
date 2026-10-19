@@ -5,6 +5,12 @@
 // 下の少数の語に限り、本文中のすべての出現を nowrap の塊にする（app/Words.tsx）。語を増やすときは
 // 必ずここに足す（自動で分割するロジックではない）。書き出した HTML でこの語がすべて塊の中にあることは
 // scripts/verify-export.mjs が検査する（リストはこの1箇所を共有する）。
+//
+// 動的に生成される文言（エラー・案内・結果文。ライブリージョン role=status/alert の中に出る）も同じ扱い:
+// 文節の塊（Phrased）は読み上げの再読み上げ・差分更新を避けるためライブリージョンでは使わないが、
+// 核語だけを <span class="nowrap core"> で包む Words は使う（span は textContent を変えず、読み上げに影響しない）。
+// 動的な文言が核語を含む場合は、必ずその文言を Words で描画する（test/dynamic-text.test.mjs が検査する）。
+// それ以外の部分の折り返しは、auto-phrase 非対応ブラウザでは標準の和文折り返しを許容する。
 
 export const CORE_WORDS: readonly string[] = [
   "仕上がり",
