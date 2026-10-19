@@ -19,11 +19,11 @@ import {
   rawCountForLength,
   roundToInteger,
   roundToTenths,
-  toIntegerGauge,
 } from "../lib/grading.ts";
 import { calcParts, calcSentence, calcStep, findEquationErrors, formatCm, isApprox } from "../lib/calc-text.ts";
 import { findPer10Errors } from "../lib/swatch-guide.ts";
-import { MAX_SAVED_LENGTH, restoreField } from "../lib/gauge-input.ts";
+import { MAX_INPUT_LENGTH } from "../lib/grading.ts";
+import { restoreField } from "../lib/gauge-input.ts";
 
 test("calcSentence: 小数第1位の境界（1.45 は ≈1.4 でなく ＝1.45）を外さない", () => {
   // 14.5 × 1 ÷ 10 = 1.45 ちょうど。「1.5」へ丸めて表示すると四捨五入で 2 になり食い違うので、2 桁まで出す
@@ -140,7 +140,6 @@ test("丸めの関数は非有限で例外を投げず NaN を返す", () => {
     assert.ok(Number.isNaN(rawCountForLength(bad, 10)));
     assert.ok(Number.isNaN(roundToTenths(bad)));
     assert.ok(Number.isNaN(roundToInteger(bad)));
-    assert.ok(Number.isNaN(toIntegerGauge(bad)));
   }
   assert.ok(!Number.isFinite(lengthForCount(0, 10))); // ゲージ 0 は Infinity（例外ではない）
 });
@@ -157,10 +156,12 @@ test("桁区切りのカンマ: 区切り位置が正しくなくても案内す
   assert.equal(parseMeasure("1,2500"), 1.25);
 });
 
-test("restoreField: 長さの上限（32 文字）を超える保存値は壊れたものとして破棄する", () => {
-  assert.equal(MAX_SAVED_LENGTH, 32);
-  assert.equal(restoreField("123.4567"), "123.4567");
-  assert.equal(restoreField("0".repeat(31) + "5"), "0".repeat(31) + "5"); // 32 文字は受理（値は範囲外でも解釈できれば）
+test("restoreField: 長さの上限は入力欄の maxLength（MAX_INPUT_LENGTH）と同じで、超える保存値は壊れたものとして破棄する", () => {
+  assert.equal(MAX_INPUT_LENGTH, 8);
+  assert.equal(restoreField("123.4567"), "123.4567"); // 8 文字は受理
+  assert.equal(restoreField("12.34567"), "12.34567");
+  assert.equal(restoreField("123.45678"), ""); // 9 文字は破棄（入力欄では入力できない長さ）
   assert.equal(restoreField("1".repeat(33)), "");
   assert.equal(restoreField("12.5" + " ".repeat(40)), "");
+  assert.equal(restoreField("12.5"), "12.5");
 });

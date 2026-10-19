@@ -1,6 +1,7 @@
 // ゲージ計算ツール（GaugeTool）の入力 4 欄から、画面に出す状態を決める純関数。
 // 結果文に出す寸法は入力欄の文字列ではなく解析済みの数値（w, l）を使う（「12.」「007」をそのまま出さない）。
 import {
+  MAX_INPUT_LENGTH,
   computeCounts,
   countsUsable,
   measureErrorMessages,
@@ -70,9 +71,6 @@ export function analyzeGaugeInputs(inputs: GaugeInputs): GaugeInputState {
 /** localStorage に保存する形（4 欄とも文字列）。 */
 export type SavedInputs = GaugeInputs;
 
-/** 保存値 1 欄の最大の長さ。これを超える値は壊れた保存値として破棄する（入力欄は 8 文字まで）。 */
-export const MAX_SAVED_LENGTH = 32;
-
 const EMPTY_SAVED: SavedInputs = { gaugeSt: "", gaugeRow: "", width: "", length: "" };
 
 /**
@@ -81,7 +79,7 @@ const EMPTY_SAVED: SavedInputs = { gaugeSt: "", gaugeRow: "", width: "", length:
  * 復元しない。復元バナーとエラーが同時に出ないようにする）。
  */
 export function restoreField(value: unknown): string {
-  if (typeof value !== "string" || value.length > MAX_SAVED_LENGTH) return "";
+  if (typeof value !== "string" || value.length > MAX_INPUT_LENGTH) return "";
   return parseMeasure(value) !== null ? normalizeMeasureText(value) : "";
 }
 

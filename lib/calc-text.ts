@@ -16,6 +16,7 @@ import {
   rawCountForLength,
   roundToTenths,
 } from "./grading.ts";
+import { allMatches } from "./regex-util.ts";
 import { exactCountInteger, matchCountDisplay, roundDecimalToInteger } from "./exact-check.ts";
 
 /** 小数第 1 位へ四捨五入（厳密。1.15 → 1.2、6.25 → 6.3）。grading.ts の整数演算を通す。 */
@@ -156,7 +157,7 @@ export function findEquationErrors(text: string): { found: number; errors: strin
   const normalized = text.replace(/\s+/g, "");
   const errors: string[] = [];
   let found = 0;
-  for (const m of normalized.matchAll(EQUATION)) {
+  for (const m of allMatches(EQUATION, normalized)) {
     found += 1;
     const [whole, len, per, relation, value, roundedTo] = m;
     if (len === undefined || per === undefined || value === undefined) continue;

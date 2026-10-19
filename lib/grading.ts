@@ -22,6 +22,9 @@ export interface Gauge {
 export const MIN_MEASURE = 1;
 export const MAX_MEASURE = 1000;
 
+/** 入力欄の最大の長さ（文字数）。入力欄の maxLength と、保存値の復元の上限に共通で使う。 */
+export const MAX_INPUT_LENGTH = 8;
+
 /** 入力欄のエラー文言（原因別）。UI は measureErrorMessage 経由でこれを使い、文言と受理範囲を一致させる。 */
 export const MEASURE_ERRORS = {
   /** 数字として読めない */
@@ -270,11 +273,6 @@ export function per10cmFrac(count: number, lengthCm: number): Frac | null {
 export function per10cmFromCount(count: number, lengthCm: number): number | null {
   const f = per10cmFrac(count, lengthCm);
   return f === null ? null : fracToNumber(f);
-}
-
-/** 10cm あたりの値を整数のゲージとして使うときの丸め（四捨五入。.5 は切り上げ）。 */
-export function toIntegerGauge(per10cm: number): number {
-  return roundToInteger(per10cm);
 }
 
 /**

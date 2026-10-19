@@ -25,6 +25,8 @@ const PATTERN = new RegExp(
   "g",
 );
 
+import { allMatches } from "./regex-util.ts";
+
 export interface TextPiece {
   text: string;
   /** 核語なら true */
@@ -35,8 +37,8 @@ export interface TextPiece {
 export function splitCoreWords(text: string): TextPiece[] {
   const out: TextPiece[] = [];
   let last = 0;
-  for (const m of text.matchAll(PATTERN)) {
-    const idx = m.index ?? 0;
+  for (const m of allMatches(PATTERN, text)) {
+    const idx = m.index;
     if (idx > last) out.push({ text: text.slice(last, idx), core: false });
     out.push({ text: m[0], core: true });
     last = idx + m[0].length;

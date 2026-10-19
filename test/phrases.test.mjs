@@ -1,6 +1,7 @@
 // 短い和文を折り返してよい位置で区切るヘルパー（lib/phrases.ts）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { CORE_WORDS } from "../lib/core-words.ts";
 import { isValidPhraseBoundary, splitPhrases } from "../lib/phrases.ts";
 import { buildSwatchFaqs } from "../lib/swatch-guide.ts";
 import { buildGaugeFaqs } from "../lib/gauge-guide.ts";
@@ -127,8 +128,8 @@ test("splitPhrases: 助詞は 1 語ずつ、非ひらがなの直後・次が非
   }
 });
 
-test("splitPhrases: 全角の句読点・中黒・コロン・括弧の後ろで切れる（次が句読点・閉じ括弧でないとき）", () => {
-  for (const c of ["、", "。", "，", "．", "！", "？", "・", "：", "；"]) {
+test("splitPhrases: 全角の句読点・コロン・括弧の後ろで切れる（中黒「・」では切れない）（次が句読点・閉じ括弧でないとき）", () => {
+  for (const c of ["、", "。", "，", "．", "！", "？", "：", "；"]) {
     assert.deepEqual(splitPhrases(`あい${c}うえ`), [`あい${c}`, "うえ"], c);
     assert.deepEqual(splitPhrases(`あい${c}目数`), [`あい${c}`, "目数"], c);
     assert.deepEqual(splitPhrases(`あい${c}${c}うえ`), [`あい${c}${c}`, "うえ"], `連続: ${c}`);
@@ -174,4 +175,55 @@ test("splitPhrases: 無作為な文字列でも、連結で元に戻り、全境
     }
   }
   assert.ok(boundaries > 5000, `境界 ${boundaries} 件`);
+});
+
+test("splitPhrases: 中黒「・」では切れず、核語（目数・段数 など）の内部は切れない", () => {
+  assert.deepEqual(splitPhrases("洗い方・仕上げ方で乾かす"), ["洗い方・仕上げ方で", "乾かす"]);
+  assert.deepEqual(splitPhrases("あい・うえ"), ["あい・うえ"]);
+  assert.deepEqual(splitPhrases("ゲージから目数・段数を出す方法"), ["ゲージから", "目数・段数を", "出す方法"]);
+  assert.deepEqual(splitPhrases("3ステップで、目数・段数まで"), ["3ステップで、", "目数・段数まで"]);
+  assert.equal(isValidPhraseBoundary("目数・", "段数"), false); // 検証規則も、中黒の後ろを区切りとは認めない
+  for (const w of CORE_WORDS) {
+    for (const text of [`あ${w}い`, `${w}から${w}を出す`, `ゲージが${w}に`, `「${w}」の${w}`, `${w}、${w}。${w}`]) {
+      const parts = splitPhrases(text);
+      assert.equal(parts.join(""), text);
+      // どの片も核語を分断しない: 核語が出現する位置は、すべて 1 つの片の中に収まる
+      let offset = 0;
+      const bounds = new Set();
+      for (const p of parts) {
+        offset += [...p].length;
+        bounds.add(offset);
+      }
+      for (const word of CORE_WORDS) {
+        let from = 0;
+        for (;;) {
+          const idx = text.indexOf(word, from);
+          if (idx < 0) break;
+          from = idx + 1;
+          const start = [...text.slice(0, idx)].length;
+          for (let k = 1; k < [...word].length; k += 1) assert.ok(!bounds.has(start + k), `${word} が ${text} で分断された`);
+        }
+      }
+    }
+  }
+});
+
+test("splitPhrases: 複合助詞（について・において・として・による）は、長い語（5 字以上の非ひらがな）の直後のときだけその直前で区切る", () => {
+  assert.deepEqual(splitPhrases("プライバシーについて"), ["プライバシー", "について"]);
+  assert.deepEqual(splitPhrases("データについて話す"), ["データについて話す"]); // 3 字の語は 1 つの塊のまま
+  assert.deepEqual(splitPhrases("整数のゲージとしてそのまま使えます"), ["整数の", "ゲージとしてそのまま使えます"]); // 「ゲージ」＋「として」は切らない
+  assert.deepEqual(splitPhrases("ひとについて"), ["ひとについて"]); // 直前がひらがななら切らない
+  assert.deepEqual(splitPhrases("手順計算処理によるちがい"), ["手順計算処理", "によるちがい"]);
+  assert.deepEqual(splitPhrases("プログラミングにおいて"), ["プログラミング", "において"]);
+  assert.deepEqual(splitPhrases("目数・段数について"), ["目数・段数", "について"]); // 核語の内部は切らず、核語の直後（5 字の語）で区切る
+  assert.ok(isValidPhraseBoundary("プライバシー", "について"));
+  assert.equal(isValidPhraseBoundary("ひと", "について"), false);
+});
+
+test("splitPhrases: 保護する語の内部は、区切りの規則に当たっても切れない（保護の有無で結果が変わる例）", () => {
+  // 「目に」の「に」は助詞で、直前が漢字・直後が漢字なので、保護がなければ「目に」の後ろで切れる
+  assert.deepEqual(splitPhrases("目に見える形", []), ["目に", "見える形"]);
+  assert.deepEqual(splitPhrases("目に見える形", ["目に見える"]), ["目に見える形"]);
+  // 保護する語の直後・直前の境界は切れる
+  assert.deepEqual(splitPhrases("手順を目に見える", ["目に見える"]), ["手順を", "目に見える"]);
 });

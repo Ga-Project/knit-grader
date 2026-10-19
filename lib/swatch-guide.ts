@@ -12,6 +12,7 @@ import {
   parseMeasure,
   per10cmFrac,
 } from "./grading.ts";
+import { allMatches } from "./regex-util.ts";
 import { exactPer10, matchPer10Display } from "./exact-check.ts";
 import type { FaqItem } from "./json-ld.ts";
 
@@ -202,7 +203,7 @@ export function findPer10Errors(text: string): { found: number; errors: string[]
   const normalized = text.replace(/\s+/g, "");
   const errors: string[] = [];
   let found = 0;
-  for (const m of normalized.matchAll(PER10_EQUATION)) {
+  for (const m of allMatches(PER10_EQUATION, normalized)) {
     found += 1;
     const [whole, count, len, relation, approxMark, value] = m;
     if (count === undefined || len === undefined || value === undefined) continue;

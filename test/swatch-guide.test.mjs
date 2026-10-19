@@ -15,8 +15,8 @@ import {
   normalizeMeasureText,
   parseMeasure,
   per10cmFromCount,
-  toIntegerGauge,
   rawCountForLength,
+  roundToInteger,
   lengthForCount,
 } from "../lib/grading.ts";
 import {
@@ -69,13 +69,6 @@ test("per10cmFromCount は lengthForCount の逆（往復で元の長さに戻�
     const per = per10cmFromCount(count, len);
     assert.ok(Math.abs(lengthForCount(per, count) - len) < 1e-9);
   }
-});
-
-test("toIntegerGauge: 四捨五入（x.5 は切り上げ）", () => {
-  assert.equal(toIntegerGauge(20.4), 20);
-  assert.equal(toIntegerGauge(20.5), 21);
-  assert.equal(toIntegerGauge(20.8333), 21);
-  assert.equal(toIntegerGauge(21), 21);
 });
 
 test("per10cmResult: 表示は小数第1位まで、近似のときだけ「約」", () => {
@@ -444,8 +437,10 @@ test("四捨五入の境界（.5 ちょうど）を外さない: 既知の再現
   assert.equal(countForLength(15, 41), 62); // 61.5
   assert.equal(countForLength(25, 5.8), 15); // 14.5
   assert.equal(countForLength(25, 6.6), 17); // 16.5
-  assert.equal(toIntegerGauge(12.5), 13);
-  assert.equal(toIntegerGauge(0.5 + 12), 13);
+  assert.equal(roundToInteger(12.5), 13);
+  assert.equal(roundToInteger(20.4), 20);
+  assert.equal(roundToInteger(20.5), 21);
+  assert.equal(roundToInteger(0.5 + 12), 13);
   assert.equal(formatDecimal(1.15), "1.2"); // 小数第 1 位の境界も 10 進どおり
   assert.equal(formatDecimal(6.25), "6.3");
   assert.equal(formatDecimal(2.05), "2.1");
