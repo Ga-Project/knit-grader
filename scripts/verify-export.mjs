@@ -20,6 +20,9 @@
 //     - FAQPage（3〜4件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
 //     - 実例の表示値（data-per10）が per10cmFromCount と一致、換算式の＝／≈が計算結果と一致
 //     - 換算部品の入力欄が空状態で描画され、/gauge/ ・トップへ相互リンクがある
+//   /shaping/
+//     - FAQPage（3件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
+//     - 早見表の各セル（data-spread）が spreadPlan と一致、実例の回数・段数・内訳が関数と一致
 //   トップ
 //     - GoatCounter タグ・SoftwareApplication JSON-LD・/gauge/ への導線
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -39,6 +42,7 @@ import {
   per10cmText,
   SWATCH_GUIDE_PATH,
 } from "../lib/swatch-guide.ts";
+import { SHAPING_GUIDE_PATH, breakdownText, buildShapingExample, chartCellText, spreadPlan, totalRows } from "../lib/shaping-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -47,6 +51,7 @@ const BASE_PATH = new URL(SITE_URL).pathname.replace(/\/$/, "");
 const SITE_ORIGIN = new URL(SITE_URL).origin;
 const GAUGE_URL = new URL(GAUGE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 const SWATCH_URL = new URL(SWATCH_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
+const SHAPING_URL = new URL(SHAPING_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 
 /**
  * 外部から読み込んでよいホスト（script・stylesheet・preload・iframe・img 等の読み込み系すべて）。
@@ -896,6 +901,29 @@ function checkSwatchPage(rel, html) {
   checkBigIntNote(rel, html);
 }
 
+/**
+ * /shaping/: JSON-LD・FAQ、早見表の各セル（data-spread の「段数,回数」から spreadPlan を引き直して表示と照合）、
+ * 実例の内訳の文（breakdownText と合計段数）が関数と一致するか。
+ */
+function checkShapingPage(rel, html) {
+  const text = visibleText(html);
+  checkFaqAndCrumbs(rel, html, text, { pageUrl: SHAPING_URL, min: 3, max: 3 });
+  const cells = [...html.matchAll(/<td data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
+  if (cells.length < 20) fail(`${rel}: 早見表のセルが ${cells.length} 個しか見つからない`);
+  for (const m of cells) {
+    const p = spreadPlan(Number(m[1]), Number(m[2]));
+    if (p === null) fail(`${rel}: 早見表のセル ${m[1]},${m[2]} が不正`);
+    else if (textOf(m[3]) !== chartCellText(p)) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の表示「${textOf(m[3])}」が計算「${chartCellText(p)}」と違う`);
+  }
+  const ex = buildShapingExample();
+  const p = ex.plan;
+  if (totalRows(p) !== p.rows) fail(`${rel}: 内訳の合計が段数と一致しない`);
+  if (!text.includes(`内訳は${breakdownText(p)}で、合わせて${p.rows}段です`)) fail(`${rel}: 実例の内訳の文が計算と一致しない`);
+  if (!html.includes(`data-calc="${ex.rowGauge},${ex.lengthCm}"`) || !text.includes(`＝ ${ex.rows}段`)) fail(`${rel}: 実例の段数が計算と一致しない`);
+  if (!text.includes(`＝ ${ex.times}回`)) fail(`${rel}: 実例の回数が計算と一致しない`);
+  if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
+}
+
 function checkTopPage(rel, html) {
   if (!html.includes(`https://${GOATCOUNTER_CODE}.goatcounter.com/count`)) {
     fail(`${rel}: GoatCounter のカウント先（${GOATCOUNTER_CODE}）が無い`);
@@ -936,6 +964,7 @@ function main() {
   if (!locs.includes(GAUGE_URL)) fail(`sitemap.xml: ${GAUGE_URL} が無い`);
   if (!locs.includes(SITE_URL)) fail(`sitemap.xml: ${SITE_URL} が無い`);
   if (!locs.includes(SWATCH_URL)) fail(`sitemap.xml: ${SWATCH_URL} が無い`);
+  if (!locs.includes(SHAPING_URL)) fail(`sitemap.xml: ${SHAPING_URL} が無い`);
   if (new Set(locs).size !== locs.length) fail("sitemap.xml: URL が重複している");
 
   for (const rel of files) {
@@ -944,7 +973,7 @@ function main() {
     checkNoPaidTerms(rel, html);
     checkPhraseBoundaries(rel, html);
     const flat = flattenBody(html);
-    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
+    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge|shaping)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
     checkFlexChildren(rel, flat.root, FLEX_SELECTORS);
     for (const t of flat.inlineFlex) fail(`${rel}: インライン style の display が flex/grid 系（検査が追えない。class と CSS の規則にすること）: ${t}`);
   }
@@ -973,6 +1002,9 @@ function main() {
   const swatch = byUrl.get(SWATCH_URL);
   if (swatch) checkSwatchPage(swatch, readFileSync(join(OUT_DIR, swatch), "utf8"));
   else fail(`${SWATCH_URL} のページが out/ に無い`);
+  const shaping = byUrl.get(SHAPING_URL);
+  if (shaping) checkShapingPage(shaping, readFileSync(join(OUT_DIR, shaping), "utf8"));
+  else fail(`${SHAPING_URL} のページが out/ に無い`);
   const top = byUrl.get(SITE_URL);
   if (top) checkTopPage(top, readFileSync(join(OUT_DIR, top), "utf8"));
   else fail("トップの index.html が無い");
