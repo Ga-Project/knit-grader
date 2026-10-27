@@ -664,7 +664,7 @@ function flattenBody(html) {
       inlineFlex.push(`<${tag} style="${attrs.style}">`);
     }
     cur.children.push(el);
-    const hidden = cls.has("visually-hidden") || attrs["aria-hidden"] === "true" || attrs.hidden !== undefined;
+    const hidden = cls.has("visually-hidden") || attrs["aria-hidden"] === "true";
     if (hidden) {
       el.hidden = true;
       skip += 1;
@@ -909,7 +909,7 @@ function checkSwatchPage(rel, html) {
 function checkShapingPage(rel, html) {
   const text = visibleText(html);
   // 表示されている文字だけを照合先にする（hidden / aria-hidden / visually-hidden の中の文字では満たさない）
-  const vis = flattenBody(html).text.replace(/\u0001/g, "");
+  const vis = flattenBody(html.replace(/<(\w+)\b[^>]*\shidden(?:=""|=hidden)?[^>]*>.*?<\/\1>/gs, "")).text.replace(/\u0001/g, "");
   checkFaqAndCrumbs(rel, html, text, { pageUrl: SHAPING_URL, min: 3, max: 3 });
   const cells = [...html.matchAll(/<td(?: class="is-mixed")? data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
   if (cells.length !== CHART_ROWS.length * CHART_TIMES.length) fail(`${rel}: 早見表のセルが ${cells.length} 個（期待 ${CHART_ROWS.length * CHART_TIMES.length}）`);
@@ -920,6 +920,20 @@ function checkShapingPage(rel, html) {
     const want = CHART_TIMES.map((t) => `${CHART_ROWS[i]},${t}`);
     if (Number(r[1]) !== CHART_ROWS[i] || spreads.join("|") !== want.join("|")) fail(`${rel}: 早見表の ${i + 1} 行目（${r[1]}段）のセルの位置が行・列の見出しと合わない（${spreads.join("|")}）`);
   });
+  for (const m of cells) {
+    const rowsN = Number(m[1]);
+    const timesN = Number(m[2]);
+    const shown = textOf(m[3]);
+    const note = shown.match(/^(\d+)〜(\d+) (\d+)×(\d+)＋(\d+)×(\d+)$/);
+    const plain = shown.match(/^(\d+)$/);
+    if (note) {
+      const [, lo, hi, a, b, c, d] = note.map(Number);
+      // 表示された文字だけで検算: 短い区切り a 段×b 回 ＋ 長い区切り c 段×d 回 が 段数・回数に一致し、c は a+1
+      if (hi !== lo + 1 || a !== lo || c !== hi || a * b + c * d !== rowsN || b + d !== timesN || b < 1 || d < 1) fail(`${rel}: 早見表 ${rowsN}段×${timesN}回の内訳「${shown}」が算術と合わない`);
+    } else if (plain) {
+      if (Number(plain[1]) * timesN !== rowsN) fail(`${rel}: 早見表 ${rowsN}段×${timesN}回の「${shown}」段ごとが算術と合わない`);
+    } else fail(`${rel}: 早見表 ${rowsN}段×${timesN}回の表示「${shown}」が読み取れない`);
+  }
   const colHeads = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/thead>/s)?.[0] ?? "").matchAll(/<th scope="col">(.*?)<\/th>/g)].map((m) => textOf(m[1]));
   const wantCols = ["段数", ...CHART_TIMES.map((t) => `${t}回`)];
   if (colHeads.join("|") !== wantCols.join("|")) fail(`${rel}: 早見表の列見出し「${colHeads.join("|")}」が定義「${wantCols.join("|")}」と違う`);
@@ -968,6 +982,14 @@ function checkShapingPage(rel, html) {
   }
   for (const f of ["回数＝増減する目数÷1回で動かす目数（両端あわせて）", "1回の区切り＝段数÷回数", "各区切りの最後の段で、目を増やす（減らす）ものとして数えます。"]) {
     if (!vis.includes(f)) fail(`${rel}: 式の枠「${f}」が一致しない`);
+  }
+  const cardFormula = vis.match(/(\d+)段×(\d+)回(?:＋(\d+)段×(\d+)回)?/);
+  if (!cardFormula) fail(`${rel}: 結果カードの内訳式が読み取れない`);
+  else {
+    const [, a, b, c, d] = cardFormula;
+    const sum = Number(a) * Number(b) + (c ? Number(c) * Number(d) : 0);
+    const cnt = Number(b) + (d ? Number(d) : 0);
+    if (sum !== p.rows || cnt !== p.times || (c && Number(c) !== Number(a) + 1)) fail(`${rel}: 結果カードの内訳式が文面の算術と合わない`);
   }
   const timesFig = html.match(/data-spread-times="(\d+),(\d+)">\s*(\d+)/);
   if (!timesFig || Number(timesFig[1]) !== p.rows || Number(timesFig[2]) !== p.times || Number(timesFig[3]) !== p.times) fail(`${rel}: 結果カードの回数が計算と一致しない`);

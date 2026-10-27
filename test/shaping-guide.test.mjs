@@ -142,3 +142,27 @@ test("固定文は意味を縛る語句をリテラルで固定する（検査�
   assert.ok(IDEA_TEXT.includes("丈の段数を回数で割り"));
   assert.ok(BAND_TITLE_TEXT.includes("数字が大きい帯が長い区切り"));
 });
+
+test("内訳の表記: 全探索で、文字列から読み取った算術が段数・回数に一致し、短い・長い区切りの回数を取り違えない", () => {
+  for (let rows = 1; rows <= 150; rows++) for (let times = 1; times <= rows; times++) {
+    const p = spreadPlan(rows, times);
+    const f = breakdownFormula(p).match(/^(\d+)段×(\d+)回(?:＋(\d+)段×(\d+)回)?$/);
+    assert.ok(f, `${rows},${times}`);
+    const [a, b, c, d] = [f[1], f[2], f[3] ?? "0", f[4] ?? "0"].map(Number);
+    assert.equal(a * b + c * d, rows);
+    assert.equal(b + d, times);
+    assert.equal(a, p.base);
+    assert.equal(b, shortCount(p));
+    if (p.extra > 0) { assert.equal(c, p.base + 1); assert.equal(d, p.extra); }
+    const note = chartCellNote(p);
+    if (p.extra === 0) assert.equal(note, "");
+    else {
+      const n = note.match(/^(\d+)×(\d+)＋(\d+)×(\d+)$/);
+      assert.ok(n, `${rows},${times}`);
+      assert.deepEqual(n.slice(1).map(Number), [p.base, shortCount(p), p.base + 1, p.extra]);
+    }
+  }
+  // 短い回数と長い回数が異なる組で、取り違えが値に出ることを固定する
+  assert.equal(chartCellNote(spreadPlan(30, 8)), "3×2＋4×6");
+  assert.equal(breakdownFormula(spreadPlan(30, 8)), "3段×2回＋4段×6回");
+});
