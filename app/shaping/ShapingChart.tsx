@@ -18,7 +18,7 @@ export function ShapingChart({ chart }: Props) {
         <caption className="visually-hidden">{TITLE}</caption>
         <thead>
           <tr>
-            <th scope="col">段数＼回数</th>
+            <th scope="col">段数</th>
             {timesList.map((t) => (
               <th scope="col" key={t}>
                 {`${t}回`}

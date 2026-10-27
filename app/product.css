@@ -1122,7 +1122,7 @@ body {
 }
 #shaping-chart {
   table-layout: fixed;
-  min-width: 34rem;
+  min-width: 42rem;
 }
 #shaping-chart .spread-cell__main {
   display: block;
@@ -1131,6 +1131,7 @@ body {
 }
 #shaping-chart .spread-cell__note {
   display: block;
+  white-space: nowrap;
   font-size: var(--fs-xs);
   color: var(--text-soft);
   font-family: var(--font-mono);

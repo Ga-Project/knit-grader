@@ -1,4 +1,4 @@
-// knit-grader — ガイド「増し目・減らし目の段数の割り振り方」（/shaping/）。
+// knit-grader — ガイド「増し目・減らし目の間隔の出し方」（/shaping/）。
 // 本文の数字（実例・早見表・FAQ）はすべて lib/shaping-guide（= 整数の割り算と lib/grading の換算関数）から導出し、
 // 手書きの数値を置かない。和文の段落は1つの文字列で書く（JSX の改行が和文の間に空白を入れるのを防ぐ）。
 import type { Metadata } from "next";
@@ -173,7 +173,7 @@ export default function ShapingGuide() {
                 text={`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります。内訳は${breakdownText(p)}で、合わせて${p.rows}段です。`}
               />
             </p>
-            <p className="spread-band__title">区切りごとの段数（左から。濃い帯が長い区切り）</p>
+            <p className="spread-band__title">区切りごとの段数（数字が大きい帯が長い区切り。並べ方は編み図に従います）</p>
             <SpreadBand plan={p} />
             <div className="result-pair guide-result">
               <div className="result-figure">
@@ -186,8 +186,10 @@ export default function ShapingGuide() {
               <div className="result-figure">
                 <div className="result-figure__label">1回の区切り</div>
                 <div className="result-figure__num">
-                  {chartCellText(p)}
-                  <span className="result-figure__unit">段</span>
+                  <span className="nowrap">
+                    {chartCellText(p)}
+                    <span className="result-figure__unit">段</span>
+                  </span>
                 </div>
                 <p className="result-figure__note">{breakdownFormula(p)}</p>
               </div>

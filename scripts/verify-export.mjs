@@ -912,7 +912,7 @@ function checkShapingPage(rel, html) {
   const cells = [...html.matchAll(/<td(?: class="is-mixed")? data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
   if (cells.length !== CHART_ROWS.length * CHART_TIMES.length) fail(`${rel}: 早見表のセルが ${cells.length} 個（期待 ${CHART_ROWS.length * CHART_TIMES.length}）`);
   const colHeads = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/thead>/s)?.[0] ?? "").matchAll(/<th scope="col">(.*?)<\/th>/g)].map((m) => textOf(m[1]));
-  const wantCols = ["段数＼回数", ...CHART_TIMES.map((t) => `${t}回`)];
+  const wantCols = ["段数", ...CHART_TIMES.map((t) => `${t}回`)];
   if (colHeads.join("|") !== wantCols.join("|")) fail(`${rel}: 早見表の列見出し「${colHeads.join("|")}」が定義「${wantCols.join("|")}」と違う`);
   const rowHeads = [...html.matchAll(/<th scope="row">(\d+)段<\/th>/g)].map((m) => Number(m[1]));
   if (rowHeads.join(",") !== CHART_ROWS.join(",")) fail(`${rel}: 早見表の行見出し「${rowHeads.join(",")}」が定義「${CHART_ROWS.join(",")}」と違う`);
