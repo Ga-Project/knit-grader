@@ -12,10 +12,13 @@ import { absoluteUrl, pageMetadata } from "../seo";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
 import {
   SHAPING_GUIDE_PATH,
+  breakdownFormula,
   breakdownText,
   buildChart,
+  exampleIntroText,
   buildShapingExample,
   buildShapingFaqs,
+  chartCellText,
   intervalText,
 } from "@/lib/shaping-guide";
 import {
@@ -24,8 +27,9 @@ import {
   serializeJsonLd,
 } from "@/lib/json-ld";
 import { ShapingChart } from "./ShapingChart";
+import { SpreadBand } from "./SpreadBand";
 
-const PAGE_NAME = "増し目・減らし目の段数の割り振り方";
+const PAGE_NAME = "増し目・減らし目の間隔の出し方";
 
 export const metadata: Metadata = pageMetadata({
   path: SHAPING_GUIDE_PATH,
@@ -91,7 +95,7 @@ export default function ShapingGuide() {
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">
                 <span>
-                  <Words text="計算ツールで段数を出す" />
+                  <Words text="ゲージから段数を出す計算ツール" />
                 </span>
               </Link>
             </div>
@@ -105,13 +109,16 @@ export default function ShapingGuide() {
             <p>
               <Words text="増し目・減らし目は、まず目数の差から回数を決めます。増やす（減らす）目数を、1回で動かす目数で割ると回数です。両端で1目ずつなら1回に2目動きます。次に、その形を作る丈の段数を回数で割り、1回あたりの区切りの段数を出します。" />
             </p>
+            <p>
+              <Words text="ここでの割り振りは目安です。往復編みでは増減を表側の段で行うことが多く、最後の増減のあとに増減のない段を残す編み図もあります。編み図に指定があれば、そちらを優先してください。" />
+            </p>
             <div className="formula-box">
               <p className="formula">
                 <span className="nowrap">回数</span>
                 <span className="formula__op">＝</span>
                 <span className="nowrap">増減する目数</span>
                 <span className="formula__op">÷</span>
-                <span className="nowrap">1回で動かす目数</span>
+                <span className="nowrap">1回で動かす目数（両端あわせて）</span>
               </p>
               <p className="formula">
                 <span className="nowrap">1回の区切り</span>
@@ -137,9 +144,7 @@ export default function ShapingGuide() {
             <span className="eyebrow">実例</span>
             <h2 id="example-heading"><Phrased text="袖の増し目を割り振る実例" /></h2>
             <p>
-              <Words
-                text={`${ex.startStitches}目から${ex.endStitches}目まで、両端で${ex.perTime}目ずつ増やします。丈は${ex.lengthCm}cmで、段数のゲージは10cmで${ex.rowGauge}段とします。`}
-              />
+              <Words text={exampleIntroText(ex)} />
             </p>
             <div className="swatch-ex">
               <div className="swatch-ex__row">
@@ -168,6 +173,8 @@ export default function ShapingGuide() {
                 text={`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります。内訳は${breakdownText(p)}で、合わせて${p.rows}段です。`}
               />
             </p>
+            <p className="spread-band__title">区切りごとの段数（左から。濃い帯が長い区切り）</p>
+            <SpreadBand plan={p} />
             <div className="result-pair guide-result">
               <div className="result-figure">
                 <div className="result-figure__label">回数</div>
@@ -179,9 +186,10 @@ export default function ShapingGuide() {
               <div className="result-figure">
                 <div className="result-figure__label">1回の区切り</div>
                 <div className="result-figure__num">
-                  {p.extra === 0 ? p.base : `${p.base}〜${p.base + 1}`}
+                  {chartCellText(p)}
                   <span className="result-figure__unit">段</span>
                 </div>
+                <p className="result-figure__note">{breakdownFormula(p)}</p>
               </div>
             </div>
           </div>
@@ -201,7 +209,7 @@ export default function ShapingGuide() {
         <section className="faq" aria-labelledby="faq-heading">
           <div className="container container-narrow">
             <span className="eyebrow">よくある質問</span>
-            <h2 id="faq-heading" style={{ marginTop: "var(--sp-2)" }}><Phrased text="増し目・減らし目のよくある質問" /></h2>
+            <h2 id="faq-heading" className="faq__heading"><Phrased text="増し目・減らし目のよくある質問" /></h2>
             <FaqList faqs={faqs} />
           </div>
         </section>
@@ -214,7 +222,9 @@ export default function ShapingGuide() {
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" href="/">
-                計算ツールを開く
+                <span>
+                  <Words text="ゲージから段数を出す" />
+                </span>
               </Link>
             </div>
           </div>

@@ -23,13 +23,13 @@ export interface SpreadPlan {
   extra: number;
 }
 
-function isCount(n: number): boolean {
+function isPositiveInt(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= MAX_SHAPING_ROWS;
 }
 
 /** 割り振りを求める。段数・回数が 1 以上の整数でない、または回数が段数を超えるときは null。 */
 export function spreadPlan(rows: number, times: number): SpreadPlan | null {
-  if (!isCount(rows) || !isCount(times) || times > rows) return null;
+  if (!isPositiveInt(rows) || !isPositiveInt(times) || times > rows) return null;
   return { rows, times, base: Math.floor(rows / times), extra: rows % times };
 }
 
@@ -43,9 +43,29 @@ export function intervalText(p: SpreadPlan): string {
   return p.extra === 0 ? `${p.base}段ごと` : `${p.base}段と${p.base + 1}段の組み合わせ`;
 }
 
-/** 早見表のセルの表示。割り切れるときは「◯段」、そうでなければ「◯〜◯段」。 */
+/** 早見表のセルの表示（単位は列見出し側に置く）。割り切れるときは「◯」、そうでなければ「◯〜◯」。 */
 export function chartCellText(p: SpreadPlan): string {
-  return p.extra === 0 ? `${p.base}段` : `${p.base}〜${p.base + 1}段`;
+  return p.extra === 0 ? `${p.base}` : `${p.base}〜${p.base + 1}`;
+}
+
+/** 早見表のセルの内訳。割り切れないときだけ「7×4＋8×4」（短い区切り×回数＋長い区切り×回数）。 */
+export function chartCellNote(p: SpreadPlan): string {
+  return p.extra === 0 ? "" : `${p.base}×${shortCount(p)}＋${p.base + 1}×${p.extra}`;
+}
+
+/** 内訳の式。「7段×4回＋8段×4回」。 */
+export function breakdownFormula(p: SpreadPlan): string {
+  return p.extra === 0
+    ? `${p.base}段×${p.times}回`
+    : `${p.base}段×${shortCount(p)}回＋${p.base + 1}段×${p.extra}回`;
+}
+
+/** 区切りごとの段数を並べた列（短い区切りを先に、長い区切りを後に。並べ方は編み図の指定に従う）。 */
+export function segmentLengths(p: SpreadPlan): number[] {
+  return [
+    ...Array.from({ length: shortCount(p) }, () => p.base),
+    ...Array.from({ length: p.extra }, () => p.base + 1),
+  ];
 }
 
 /** 内訳の文。「3回は7段、1回は8段」のように、回数が 0 の区切りは書かない。 */
@@ -67,7 +87,7 @@ export function totalRows(p: SpreadPlan): number {
  * 割り切れないとき・入力が不正なときは null（呼び出し側で「1回の目数を混ぜる」案内にする）。
  */
 export function timesForDelta(delta: number, perTime: number): number | null {
-  if (!isCount(delta) || !isCount(perTime)) return null;
+  if (!isPositiveInt(delta) || !isPositiveInt(perTime)) return null;
   return delta % perTime === 0 ? delta / perTime : null;
 }
 
@@ -87,7 +107,10 @@ export interface ShapingExample {
   startStitches: number;
   endStitches: number;
   delta: number;
+  /** 1回に動かす目数の合計（両端あわせて） */
   perTime: number;
+  /** 片端あたりの目数（perTime の半分） */
+  perSide: number;
   times: number;
   rowGauge: number;
   lengthCm: number;
@@ -101,8 +124,25 @@ export function buildShapingExample(): ShapingExample {
   const times = timesForDelta(delta, perTime);
   const rows = countForLength(rowGauge, lengthCm);
   const plan = times === null ? null : spreadPlan(rows, times);
-  if (times === null || plan === null) throw new Error("shaping example input is invalid");
-  return { startStitches, endStitches, delta, perTime, times, rowGauge, lengthCm, rows, plan };
+  if (times === null || plan === null || perTime % 2 !== 0) throw new Error("shaping example input is invalid");
+  return { startStitches, endStitches, delta, perTime, perSide: perTime / 2, times, rowGauge, lengthCm, rows, plan };
+}
+
+/** 実例の前提の文（本文の表示と検査・テストの共通の源）。perTime は両端あわせた目数。 */
+export function exampleIntroText(ex: ShapingExample): string {
+  return (
+    `${ex.startStitches}目から${ex.endStitches}目まで増やします。両端で${ex.perSide}目ずつ、1回に${ex.perTime}目増やすものとします。` +
+    `丈は${ex.lengthCm}cmで、段数のゲージは10cmで${ex.rowGauge}段です。増減に使う段数は丈の段数すべてとみなした目安です。`
+  );
+}
+
+/** 「増し目の回数はどう決めますか？」の回答。 */
+export function timesFaqAnswer(ex: ShapingExample): string {
+  return (
+    "増やす目数を、1回で増える目数（両端あわせた目数）で割ります。" +
+    `たとえば${ex.startStitches}目から${ex.endStitches}目まで増やすなら${ex.delta}目で、` +
+    `両端で${ex.perSide}目ずつ（1回に${ex.perTime}目）増やすなら${ex.times}回です。`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -141,17 +181,14 @@ export function buildShapingFaqs(): FaqItem[] {
   return [
     {
       q: "増し目の回数はどう決めますか？",
-      a:
-        "増やす目数を、1回で増える目数で割ります。" +
-        `たとえば${ex.startStitches}目から${ex.endStitches}目まで増やすなら${ex.delta}目で、` +
-        `両端で${ex.perTime}目ずつ増やすなら${ex.times}回です。`,
+      a: timesFaqAnswer(ex),
     },
     {
       q: "段数が回数で割り切れないときはどうしますか？",
       a:
         "短い区切りと長い区切りを組み合わせて、合計の段数に合わせます。" +
         `たとえば${p.rows}段を${p.times}回に分けるなら、${breakdownText(p)}で、合わせて${totalRows(p)}段です。` +
-        "どの順に並べるかは、編み図に指定があればそれに従ってください。",
+        "どの順に並べるかは、編み図に指定があればそれに従ってください。割り振りは目安で、最後の増減のあとに増減のない段を残す場合も、編み図の指定を優先します。",
     },
     {
       q: "減らし目も同じ考え方ですか？",

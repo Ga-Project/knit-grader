@@ -27,6 +27,7 @@ import {
   serializeJsonLd,
 } from "@/lib/json-ld";
 import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
+import { SHAPING_GUIDE_PATH } from "@/lib/shaping-guide";
 import { QuickChart } from "./QuickChart";
 
 const PAGE_NAME = "ゲージから目数・段数を出す方法";
@@ -178,6 +179,11 @@ export default function GaugeGuide() {
             <p className="faq__more">
               <Link href={SWATCH_GUIDE_PATH}>
                 <Words text="ゲージの測り方（スワッチの編み方と数え方）" />
+              </Link>
+            </p>
+            <p className="faq__more">
+              <Link href={SHAPING_GUIDE_PATH}>
+                <Words text="増し目・減らし目の間隔の出し方（何段ごとに何回）" />
               </Link>
             </p>
           </div>

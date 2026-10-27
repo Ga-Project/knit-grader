@@ -10,6 +10,11 @@ import {
   buildChart,
   buildShapingExample,
   buildShapingFaqs,
+  breakdownFormula,
+  chartCellNote,
+  segmentLengths,
+  exampleIntroText,
+  timesFaqAnswer,
   chartCellText,
   intervalText,
   shortCount,
@@ -59,11 +64,16 @@ test("timesForDelta: 割り切れるときだけ回数を返す", () => {
 test("intervalText / chartCellText / breakdownText: 割り切れるときと割り切れないときで言い切りが変わる", () => {
   const exact = spreadPlan(60, 6);
   assert.equal(intervalText(exact), "10段ごと");
-  assert.equal(chartCellText(exact), "10段");
+  assert.equal(chartCellText(exact), "10");
+  assert.equal(chartCellNote(exact), "");
+  assert.equal(breakdownFormula(exact), "10段×6回");
   assert.equal(breakdownText(exact), "6回は10段");
   const mixed = spreadPlan(60, 8);
   assert.equal(intervalText(mixed), "7段と8段の組み合わせ");
-  assert.equal(chartCellText(mixed), "7〜8段");
+  assert.equal(chartCellText(mixed), "7〜8");
+  assert.equal(chartCellNote(mixed), "7×4＋8×4");
+  assert.equal(breakdownFormula(mixed), "7段×4回＋8段×4回");
+  assert.deepEqual(segmentLengths(mixed), [7, 7, 7, 7, 8, 8, 8, 8]);
   assert.equal(breakdownText(mixed), "4回は7段、4回は8段");
   const onlyLong = spreadPlan(7, 6); // base=1, extra=1
   assert.equal(breakdownText(onlyLong), "5回は1段、1回は2段");
@@ -96,7 +106,23 @@ test("buildShapingFaqs: 3件で、数字が実例から導出され、内訳の�
   assert.equal(faqs.length, 3);
   for (const f of faqs) assert.ok(f.q.length > 0 && f.a.length > 0);
   const ex = buildShapingExample();
-  assert.ok(faqs[0].a.includes(`${ex.times}回`));
+  assert.equal(faqs[0].a, timesFaqAnswer(ex));
+  assert.ok(faqs[0].a.includes(`両端で${ex.perSide}目ずつ（1回に${ex.perTime}目）`));
+  assert.equal(ex.perSide * 2, ex.perTime);
+  assert.equal(ex.times * ex.perSide * 2, ex.delta, "回数×両端の増減が増える目数に一致する");
+  const intro = exampleIntroText(ex);
+  assert.ok(intro.includes(`両端で${ex.perSide}目ずつ、1回に${ex.perTime}目`));
   assert.ok(faqs[1].a.includes(breakdownText(ex.plan)));
   assert.ok(faqs[1].a.includes(`合わせて${totalRows(ex.plan)}段`));
+});
+
+test("segmentLengths: 全探索で合計が段数・個数が回数・長短が内訳どおり", () => {
+  for (let rows = 1; rows <= 90; rows++) for (let times = 1; times <= rows; times++) {
+    const p = spreadPlan(rows, times);
+    const segs = segmentLengths(p);
+    assert.equal(segs.length, times);
+    assert.equal(segs.reduce((a, b) => a + b, 0), rows);
+    assert.equal(segs.filter((x) => x === p.base).length, shortCount(p));
+    assert.equal(segs.filter((x) => x === p.base + 1).length, p.extra);
+  }
 });

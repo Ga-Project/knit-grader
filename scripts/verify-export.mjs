@@ -42,7 +42,7 @@ import {
   per10cmText,
   SWATCH_GUIDE_PATH,
 } from "../lib/swatch-guide.ts";
-import { SHAPING_GUIDE_PATH, breakdownText, buildShapingExample, chartCellText, spreadPlan, totalRows } from "../lib/shaping-guide.ts";
+import { CHART_ROWS, CHART_TIMES, SHAPING_GUIDE_PATH, breakdownFormula, breakdownText, buildShapingExample, chartCellNote, chartCellText, segmentLengths, exampleIntroText, intervalText, spreadPlan, timesFaqAnswer, totalRows } from "../lib/shaping-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -416,6 +416,7 @@ function checkGaugePage(rel, html) {
   for (const e of eq.errors) fail(`${rel}: 計算式の食い違い ${e}`);
 
   if (!html.includes(`href="${BASE_PATH}${SWATCH_GUIDE_PATH}"`)) fail(`${rel}: /swatch/ への導線が無い`);
+  if (!html.includes(`href="${BASE_PATH}${SHAPING_GUIDE_PATH}"`)) fail(`${rel}: /shaping/ への導線が無い`);
   checkQuickChart(rel, html);
   checkMarkers(rel, html);
   checkFinishedClaims(rel, html);
@@ -908,12 +909,26 @@ function checkSwatchPage(rel, html) {
 function checkShapingPage(rel, html) {
   const text = visibleText(html);
   checkFaqAndCrumbs(rel, html, text, { pageUrl: SHAPING_URL, min: 3, max: 3 });
-  const cells = [...html.matchAll(/<td data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
-  if (cells.length < 20) fail(`${rel}: 早見表のセルが ${cells.length} 個しか見つからない`);
+  const cells = [...html.matchAll(/<td(?: class="is-mixed")? data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
+  if (cells.length !== CHART_ROWS.length * CHART_TIMES.length) fail(`${rel}: 早見表のセルが ${cells.length} 個（期待 ${CHART_ROWS.length * CHART_TIMES.length}）`);
+  const colHeads = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/thead>/s)?.[0] ?? "").matchAll(/<th scope="col">(.*?)<\/th>/g)].map((m) => textOf(m[1]));
+  const wantCols = ["段数＼回数", ...CHART_TIMES.map((t) => `${t}回`)];
+  if (colHeads.join("|") !== wantCols.join("|")) fail(`${rel}: 早見表の列見出し「${colHeads.join("|")}」が定義「${wantCols.join("|")}」と違う`);
+  const rowHeads = [...html.matchAll(/<th scope="row">(\d+)段<\/th>/g)].map((m) => Number(m[1]));
+  if (rowHeads.join(",") !== CHART_ROWS.join(",")) fail(`${rel}: 早見表の行見出し「${rowHeads.join(",")}」が定義「${CHART_ROWS.join(",")}」と違う`);
+  for (const m of cells) {
+    const col = CHART_TIMES.indexOf(Number(m[2]));
+    const rowI = CHART_ROWS.indexOf(Number(m[1]));
+    if (col < 0 || rowI < 0) fail(`${rel}: 早見表のセル ${m[1]},${m[2]} が見出しの定義に無い`);
+  }
   for (const m of cells) {
     const p = spreadPlan(Number(m[1]), Number(m[2]));
     if (p === null) fail(`${rel}: 早見表のセル ${m[1]},${m[2]} が不正`);
-    else if (textOf(m[3]) !== chartCellText(p)) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の表示「${textOf(m[3])}」が計算「${chartCellText(p)}」と違う`);
+    else {
+      if (textOf(m[3]) !== `${chartCellText(p)}${chartCellNote(p)}`) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の表示「${textOf(m[3])}」が計算「${chartCellText(p)}${chartCellNote(p)}」と違う`);
+      const mixedClass = m[0].startsWith('<td class="is-mixed"');
+      if (mixedClass !== (p.extra !== 0)) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の「組み合わせ」の印が計算と食い違う`);
+    }
   }
   const ex = buildShapingExample();
   const p = ex.plan;
@@ -921,6 +936,35 @@ function checkShapingPage(rel, html) {
   if (!text.includes(`内訳は${breakdownText(p)}で、合わせて${p.rows}段です`)) fail(`${rel}: 実例の内訳の文が計算と一致しない`);
   if (!html.includes(`data-calc="${ex.rowGauge},${ex.lengthCm}"`) || !text.includes(`＝ ${ex.rows}段`)) fail(`${rel}: 実例の段数が計算と一致しない`);
   if (!text.includes(`＝ ${ex.times}回`)) fail(`${rel}: 実例の回数が計算と一致しない`);
+  // 本文の主張を、関数を使わず文面の数字だけで検算する（関数と表示が一致したまま意味が誤る退行を検出する）
+  const claim = text.match(/(\d+)目から(\d+)目まで増やします。両端で(\d+)目ずつ、1回に(\d+)目増やす/);
+  if (!claim) fail(`${rel}: 実例の前提の文が読み取れない`);
+  else {
+    const [, a, b, side, per] = claim.map(Number);
+    if (per !== side * 2) fail(`${rel}: 「両端で${side}目ずつ」と「1回に${per}目」が食い違う`);
+    const calc = text.match(/\((\d+) − (\d+)\) ÷ (\d+) ＝ (\d+)回/);
+    if (!calc) fail(`${rel}: 回数の計算式が読み取れない`);
+    else {
+      const [, e, st, d, n] = calc.map(Number);
+      if (e !== b || st !== a || d !== per || n * d !== e - st) fail(`${rel}: 回数の計算式（${e}−${st}）÷${d}＝${n} が前提の文と合わない`);
+    }
+  }
+  if (!text.includes(exampleIntroText(ex))) fail(`${rel}: 実例の前提の文が関数の出力と一致しない`);
+  if (!text.includes(`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります`)) fail(`${rel}: 実例の区切りの文が計算と一致しない`);
+  const timesFig = html.match(/data-spread-times="(\d+),(\d+)">\s*(\d+)/);
+  if (!timesFig || Number(timesFig[1]) !== p.rows || Number(timesFig[2]) !== p.times || Number(timesFig[3]) !== p.times) fail(`${rel}: 結果カードの回数が計算と一致しない`);
+  const cardText = textOf(html.match(/1回の区切り<\/div>\s*<div class="result-figure__num">(.*?)<\/div>/s)?.[1] ?? "");
+  if (cardText !== `${chartCellText(p)}段`) fail(`${rel}: 結果カードの区切り「${cardText}」が計算「${chartCellText(p)}段」と違う`);
+  if (!text.includes(breakdownFormula(p))) fail(`${rel}: 結果カードの内訳の式が計算「${breakdownFormula(p)}」と一致しない`);
+  const segs = [...html.matchAll(/<li class="spread-band__seg(?: is-long)?" data-seg="(\d+)">(\d+)<\/li>/g)];
+  if (segs.map((m) => Number(m[1])).join(",") !== segmentLengths(p).join(",") || segs.some((m) => m[1] !== m[2])) fail(`${rel}: 区切りの帯が計算と一致しない`);
+  if (segs.reduce((a, m) => a + Number(m[1]), 0) !== p.rows) fail(`${rel}: 区切りの帯の合計が段数と一致しない`);
+  for (const m of segs) {
+    const isLongClass = html.includes(`<li class="spread-band__seg is-long" data-seg="${m[1]}">`);
+    if (isLongClass !== (Number(m[1]) !== p.base)) fail(`${rel}: 区切り ${m[1]} 段の濃淡が長短と食い違う`);
+  }
+  const faqAnswers = [...html.matchAll(/"acceptedAnswer":\{"@type":"Answer","text":"(.*?)"\}/g)].map((m) => m[1]);
+  if (!faqAnswers.some((a) => a.includes(timesFaqAnswer(ex)))) fail(`${rel}: FAQ の回数の回答が関数の出力と一致しない`);
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
 }
 
