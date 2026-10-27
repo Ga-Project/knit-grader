@@ -42,7 +42,7 @@ import {
   per10cmText,
   SWATCH_GUIDE_PATH,
 } from "../lib/swatch-guide.ts";
-import { CHART_ROWS, CHART_TIMES, SHAPING_GUIDE_PATH, breakdownFormula, breakdownText, buildShapingExample, chartCellNote, chartCellText, segmentLengths, exampleIntroText, intervalText, spreadPlan, timesFaqAnswer, totalRows } from "../lib/shaping-guide.ts";
+import { CHART_ROWS, CHART_TIMES, SHAPING_GUIDE_PATH, BAND_TITLE_TEXT, CAVEAT_TEXT, CHART_INTRO_TEXT, FORMULA_TIMES_LABEL, IDEA_TEXT, breakdownFormula, breakdownText, buildShapingExample, chartCellNote, chartCellText, segmentLengths, exampleIntroText, intervalText, spreadPlan, timesFaqAnswer, totalRows } from "../lib/shaping-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -925,7 +925,7 @@ function checkShapingPage(rel, html) {
     const p = spreadPlan(Number(m[1]), Number(m[2]));
     if (p === null) fail(`${rel}: 早見表のセル ${m[1]},${m[2]} が不正`);
     else {
-      if (textOf(m[3]) !== `${chartCellText(p)}${chartCellNote(p)}`) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の表示「${textOf(m[3])}」が計算「${chartCellText(p)}${chartCellNote(p)}」と違う`);
+      if (textOf(m[3]) !== `${chartCellText(p)}${chartCellNote(p) ? " " + chartCellNote(p) : ""}`) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の表示「${textOf(m[3])}」が計算「${chartCellText(p)} ${chartCellNote(p)}」と違う`);
       const mixedClass = m[0].startsWith('<td class="is-mixed"');
       if (mixedClass !== (p.extra !== 0)) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の「組み合わせ」の印が計算と食い違う`);
     }
@@ -956,13 +956,23 @@ function checkShapingPage(rel, html) {
   const cardText = textOf(html.match(/1回の区切り<\/div>\s*<div class="result-figure__num">(.*?)<\/div>/s)?.[1] ?? "");
   if (cardText !== `${chartCellText(p)}段`) fail(`${rel}: 結果カードの区切り「${cardText}」が計算「${chartCellText(p)}段」と違う`);
   if (!text.includes(breakdownFormula(p))) fail(`${rel}: 結果カードの内訳の式が計算「${breakdownFormula(p)}」と一致しない`);
-  const segs = [...html.matchAll(/<li class="spread-band__seg(?: is-long)?" data-seg="(\d+)">(\d+)<\/li>/g)];
-  if (segs.map((m) => Number(m[1])).join(",") !== segmentLengths(p).join(",") || segs.some((m) => m[1] !== m[2])) fail(`${rel}: 区切りの帯が計算と一致しない`);
-  if (segs.reduce((a, m) => a + Number(m[1]), 0) !== p.rows) fail(`${rel}: 区切りの帯の合計が段数と一致しない`);
+  const segs = [...html.matchAll(/<li class="(spread-band__seg(?: is-long)?)" data-seg="(\d+)">(\d+)<\/li>/g)];
+  if (segs.map((m) => Number(m[2])).join(",") !== segmentLengths(p).join(",") || segs.some((m) => m[2] !== m[3])) fail(`${rel}: 区切りの帯が計算と一致しない`);
+  if (segs.reduce((a, m) => a + Number(m[2]), 0) !== p.rows) fail(`${rel}: 区切りの帯の合計が段数と一致しない`);
   for (const m of segs) {
-    const isLongClass = html.includes(`<li class="spread-band__seg is-long" data-seg="${m[1]}">`);
-    if (isLongClass !== (Number(m[1]) !== p.base)) fail(`${rel}: 区切り ${m[1]} 段の濃淡が長短と食い違う`);
+    if (m[1].includes("is-long") !== (Number(m[2]) !== p.base)) fail(`${rel}: 区切り ${m[2]} 段の濃淡が長短と食い違う`);
   }
+  const bandOpen = html.match(/<ol class="spread-band" aria-label="([^"]*)" style="([^"]*)">/);
+  if (!bandOpen) fail(`${rel}: 区切りの帯の開始タグが読み取れない`);
+  else {
+    if (bandOpen[1] !== `${p.rows}段を${p.times}回に分けた区切りの段数`) fail(`${rel}: 帯の aria-label「${bandOpen[1]}」が計算と一致しない`);
+    if (!new RegExp(`--segs:\\s*${segs.length}\\b`).test(bandOpen[2]) || segs.length !== p.times) fail(`${rel}: 帯の列数（--segs）が区切りの数と一致しない`);
+  }
+  for (const [name, want] of [["考え方の段落", IDEA_TEXT], ["目安の断り書き", CAVEAT_TEXT], ["早見表の説明", CHART_INTRO_TEXT], ["帯の見出し", BAND_TITLE_TEXT], ["式の注記", FORMULA_TIMES_LABEL]]) {
+    if (!text.includes(want)) fail(`${rel}: ${name}が定義した文と一致しない`);
+  }
+  const idea = IDEA_TEXT.match(/両端で(\d+)目ずつなら1回に(\d+)目/);
+  if (!idea || Number(idea[2]) !== Number(idea[1]) * 2) fail(`${rel}: 考え方の段落の「両端で◯目ずつなら1回に◯目」が整合しない`);
   const faqAnswers = [...html.matchAll(/"acceptedAnswer":\{"@type":"Answer","text":"(.*?)"\}/g)].map((m) => m[1]);
   if (!faqAnswers.some((a) => a.includes(timesFaqAnswer(ex)))) fail(`${rel}: FAQ の回数の回答が関数の出力と一致しない`);
   if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);

@@ -12,6 +12,11 @@ import { absoluteUrl, pageMetadata } from "../seo";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
 import {
   SHAPING_GUIDE_PATH,
+  BAND_TITLE_TEXT,
+  CAVEAT_TEXT,
+  CHART_INTRO_TEXT,
+  FORMULA_TIMES_LABEL,
+  IDEA_TEXT,
   breakdownFormula,
   breakdownText,
   buildChart,
@@ -107,10 +112,10 @@ export default function ShapingGuide() {
             <span className="eyebrow">考え方</span>
             <h2 id="idea-heading"><Phrased text="回数を出してから、段数を割り振る" /></h2>
             <p>
-              <Words text="増し目・減らし目は、まず目数の差から回数を決めます。増やす（減らす）目数を、1回で動かす目数で割ると回数です。両端で1目ずつなら1回に2目動きます。次に、その形を作る丈の段数を回数で割り、1回あたりの区切りの段数を出します。" />
+              <Words text={IDEA_TEXT} />
             </p>
             <p>
-              <Words text="ここでの割り振りは目安です。往復編みでは増減を表側の段で行うことが多く、最後の増減のあとに増減のない段を残す編み図もあります。編み図に指定があれば、そちらを優先してください。" />
+              <Words text={CAVEAT_TEXT} />
             </p>
             <div className="formula-box">
               <p className="formula">
@@ -118,7 +123,7 @@ export default function ShapingGuide() {
                 <span className="formula__op">＝</span>
                 <span className="nowrap">増減する目数</span>
                 <span className="formula__op">÷</span>
-                <span className="nowrap">1回で動かす目数（両端あわせて）</span>
+                <span className="nowrap">{FORMULA_TIMES_LABEL}</span>
               </p>
               <p className="formula">
                 <span className="nowrap">1回の区切り</span>
@@ -173,7 +178,7 @@ export default function ShapingGuide() {
                 text={`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります。内訳は${breakdownText(p)}で、合わせて${p.rows}段です。`}
               />
             </p>
-            <p className="spread-band__title">区切りごとの段数（数字が大きい帯が長い区切り。並べ方は編み図に従います）</p>
+            <p className="spread-band__title">{BAND_TITLE_TEXT}</p>
             <SpreadBand plan={p} />
             <div className="result-pair guide-result">
               <div className="result-figure">
@@ -202,7 +207,7 @@ export default function ShapingGuide() {
             <span className="eyebrow">早見表</span>
             <h2 id="chart-heading"><Phrased text="段数と回数から見る区切りの早見表" /></h2>
             <p>
-              <Words text="左の列が段数、上の行が回数です。交わるところが1回の区切りの段数で、「◯〜◯段」のように幅があるときは、短い区切りと長い区切りを組み合わせて段数の合計に合わせます。" />
+              <Words text={CHART_INTRO_TEXT} />
             </p>
             <ShapingChart chart={chart} />
           </div>

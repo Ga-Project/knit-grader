@@ -37,7 +37,12 @@ export function ShapingChart({ chart }: Props) {
                   data-spread={`${p.rows},${p.times}`}
                 >
                   <span className="spread-cell__main">{chartCellText(p)}</span>
-                  {p.extra === 0 ? null : <span className="spread-cell__note">{chartCellNote(p)}</span>}
+                  {p.extra === 0 ? null : (
+                    <>
+                      {" "}
+                      <span className="spread-cell__note">{chartCellNote(p)}</span>
+                    </>
+                  )}
                 </td>
               ))}
             </tr>
