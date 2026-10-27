@@ -664,7 +664,7 @@ function flattenBody(html) {
       inlineFlex.push(`<${tag} style="${attrs.style}">`);
     }
     cur.children.push(el);
-    const hidden = cls.has("visually-hidden") || attrs["aria-hidden"] === "true";
+    const hidden = cls.has("visually-hidden") || attrs["aria-hidden"] === "true" || attrs.hidden !== undefined;
     if (hidden) {
       el.hidden = true;
       skip += 1;
@@ -908,9 +908,18 @@ function checkSwatchPage(rel, html) {
  */
 function checkShapingPage(rel, html) {
   const text = visibleText(html);
+  // 表示されている文字だけを照合先にする（hidden / aria-hidden / visually-hidden の中の文字では満たさない）
+  const vis = flattenBody(html).text.replace(/\u0001/g, "");
   checkFaqAndCrumbs(rel, html, text, { pageUrl: SHAPING_URL, min: 3, max: 3 });
   const cells = [...html.matchAll(/<td(?: class="is-mixed")? data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
   if (cells.length !== CHART_ROWS.length * CHART_TIMES.length) fail(`${rel}: 早見表のセルが ${cells.length} 個（期待 ${CHART_ROWS.length * CHART_TIMES.length}）`);
+  const bodyRows = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/table>/s)?.[0] ?? "").matchAll(/<tr>(?:(?!<\/tr>).)*<th scope="row">(\d+)段<\/th>(.*?)<\/tr>/gs)];
+  if (bodyRows.length !== CHART_ROWS.length) fail(`${rel}: 早見表の行が ${bodyRows.length} 本（期待 ${CHART_ROWS.length}）`);
+  bodyRows.forEach((r, i) => {
+    const spreads = [...r[2].matchAll(/data-spread="(\d+),(\d+)"/g)].map((m) => `${m[1]},${m[2]}`);
+    const want = CHART_TIMES.map((t) => `${CHART_ROWS[i]},${t}`);
+    if (Number(r[1]) !== CHART_ROWS[i] || spreads.join("|") !== want.join("|")) fail(`${rel}: 早見表の ${i + 1} 行目（${r[1]}段）のセルの位置が行・列の見出しと合わない（${spreads.join("|")}）`);
+  });
   const colHeads = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/thead>/s)?.[0] ?? "").matchAll(/<th scope="col">(.*?)<\/th>/g)].map((m) => textOf(m[1]));
   const wantCols = ["段数", ...CHART_TIMES.map((t) => `${t}回`)];
   if (colHeads.join("|") !== wantCols.join("|")) fail(`${rel}: 早見表の列見出し「${colHeads.join("|")}」が定義「${wantCols.join("|")}」と違う`);
@@ -933,29 +942,40 @@ function checkShapingPage(rel, html) {
   const ex = buildShapingExample();
   const p = ex.plan;
   if (totalRows(p) !== p.rows) fail(`${rel}: 内訳の合計が段数と一致しない`);
-  if (!text.includes(`内訳は${breakdownText(p)}で、合わせて${p.rows}段です`)) fail(`${rel}: 実例の内訳の文が計算と一致しない`);
-  if (!html.includes(`data-calc="${ex.rowGauge},${ex.lengthCm}"`) || !text.includes(`＝ ${ex.rows}段`)) fail(`${rel}: 実例の段数が計算と一致しない`);
-  if (!text.includes(`＝ ${ex.times}回`)) fail(`${rel}: 実例の回数が計算と一致しない`);
+  if (!vis.includes(`内訳は${breakdownText(p)}で、合わせて${p.rows}段です`)) fail(`${rel}: 実例の内訳の文が計算と一致しない`);
+  if (!html.includes(`data-calc="${ex.rowGauge},${ex.lengthCm}"`) || !vis.includes(`＝ ${ex.rows}段`)) fail(`${rel}: 実例の段数が計算と一致しない`);
+  if (!vis.includes(`＝ ${ex.times}回`)) fail(`${rel}: 実例の回数が計算と一致しない`);
   // 本文の主張を、関数を使わず文面の数字だけで検算する（関数と表示が一致したまま意味が誤る退行を検出する）
-  const claim = text.match(/(\d+)目から(\d+)目まで増やします。両端で(\d+)目ずつ、1回に(\d+)目増やす/);
+  const claim = vis.match(/(\d+)目から(\d+)目まで増やします。両端で(\d+)目ずつ、1回に(\d+)目増やす/);
   if (!claim) fail(`${rel}: 実例の前提の文が読み取れない`);
   else {
     const [, a, b, side, per] = claim.map(Number);
     if (per !== side * 2) fail(`${rel}: 「両端で${side}目ずつ」と「1回に${per}目」が食い違う`);
-    const calc = text.match(/\((\d+) − (\d+)\) ÷ (\d+) ＝ (\d+)回/);
+    const calc = vis.match(/\((\d+) − (\d+)\) ÷ (\d+) ＝ (\d+)回/);
     if (!calc) fail(`${rel}: 回数の計算式が読み取れない`);
     else {
       const [, e, st, d, n] = calc.map(Number);
       if (e !== b || st !== a || d !== per || n * d !== e - st) fail(`${rel}: 回数の計算式（${e}−${st}）÷${d}＝${n} が前提の文と合わない`);
     }
   }
-  if (!text.includes(exampleIntroText(ex))) fail(`${rel}: 実例の前提の文が関数の出力と一致しない`);
-  if (!text.includes(`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります`)) fail(`${rel}: 実例の区切りの文が計算と一致しない`);
+  if (!vis.includes(exampleIntroText(ex))) fail(`${rel}: 実例の前提の文が関数の出力と一致しない`);
+  if (!vis.includes(`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります`)) fail(`${rel}: 実例の区切りの文が計算と一致しない`);
+  const calcSt = vis.match(/(\d+) ÷ 10 × (\d+) ＝ (\d+)段/);
+  if (!calcSt) fail(`${rel}: 段数の計算式が読み取れない`);
+  else {
+    const [, len, gg, n] = calcSt.map(Number);
+    if (len !== ex.lengthCm || gg !== ex.rowGauge || Math.round((len * gg) / 10) !== n || n !== ex.rows) fail(`${rel}: 段数の計算式 ${len}÷10×${gg}＝${n} が前提と合わない`);
+  }
+  for (const f of ["回数＝増減する目数÷1回で動かす目数（両端あわせて）", "1回の区切り＝段数÷回数", "各区切りの最後の段で、目を増やす（減らす）ものとして数えます。"]) {
+    if (!vis.includes(f)) fail(`${rel}: 式の枠「${f}」が一致しない`);
+  }
   const timesFig = html.match(/data-spread-times="(\d+),(\d+)">\s*(\d+)/);
   if (!timesFig || Number(timesFig[1]) !== p.rows || Number(timesFig[2]) !== p.times || Number(timesFig[3]) !== p.times) fail(`${rel}: 結果カードの回数が計算と一致しない`);
+  const timesCard = textOf(html.match(/<div class="result-figure__label">回数<\/div>\s*<div class="result-figure__num"[^>]*>(.*?)<\/div>/s)?.[1] ?? "");
+  if (timesCard !== `${p.times}回`) fail(`${rel}: 結果カードの回数の表示「${timesCard}」が「${p.times}回」と違う`);
   const cardText = textOf(html.match(/1回の区切り<\/div>\s*<div class="result-figure__num"[^>]*>(.*?)<\/div>/s)?.[1] ?? "");
   if (cardText !== `${chartCellText(p)}段`) fail(`${rel}: 結果カードの区切り「${cardText}」が計算「${chartCellText(p)}段」と違う`);
-  if (!text.includes(breakdownFormula(p))) fail(`${rel}: 結果カードの内訳の式が計算「${breakdownFormula(p)}」と一致しない`);
+  if (!vis.includes(breakdownFormula(p))) fail(`${rel}: 結果カードの内訳の式が計算「${breakdownFormula(p)}」と一致しない`);
   const segs = [...html.matchAll(/<li class="(spread-band__seg(?: is-long)?)" data-seg="(\d+)">(\d+)<\/li>/g)];
   if (segs.map((m) => Number(m[2])).join(",") !== segmentLengths(p).join(",") || segs.some((m) => m[2] !== m[3])) fail(`${rel}: 区切りの帯が計算と一致しない`);
   if (segs.reduce((a, m) => a + Number(m[2]), 0) !== p.rows) fail(`${rel}: 区切りの帯の合計が段数と一致しない`);
@@ -966,10 +986,10 @@ function checkShapingPage(rel, html) {
   if (!bandOpen) fail(`${rel}: 区切りの帯の開始タグが読み取れない`);
   else {
     if (bandOpen[1] !== `${p.rows}段を${p.times}回に分けた区切りの段数`) fail(`${rel}: 帯の aria-label「${bandOpen[1]}」が計算と一致しない`);
-    if (!new RegExp(`--segs:\\s*${segs.length}\\b`).test(bandOpen[2]) || segs.length !== p.times) fail(`${rel}: 帯の列数（--segs）が区切りの数と一致しない`);
+    if (!new RegExp(`^\\s*--segs:\\s*${segs.length}\\s*;?\\s*$`).test(bandOpen[2]) || segs.length !== p.times) fail(`${rel}: 帯の列数（--segs）が区切りの数と一致しない`);
   }
   for (const [name, want] of [["考え方の段落", IDEA_TEXT], ["目安の断り書き", CAVEAT_TEXT], ["早見表の説明", CHART_INTRO_TEXT], ["帯の見出し", BAND_TITLE_TEXT], ["式の注記", FORMULA_TIMES_LABEL]]) {
-    if (!text.includes(want)) fail(`${rel}: ${name}が定義した文と一致しない`);
+    if (!vis.includes(want)) fail(`${rel}: ${name}が定義した文と一致しない`);
   }
   const idea = IDEA_TEXT.match(/両端で(\d+)目ずつなら1回に(\d+)目/);
   if (!idea || Number(idea[2]) !== Number(idea[1]) * 2) fail(`${rel}: 考え方の段落の「両端で◯目ずつなら1回に◯目」が整合しない`);

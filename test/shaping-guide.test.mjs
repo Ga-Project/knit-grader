@@ -10,6 +10,11 @@ import {
   buildChart,
   buildShapingExample,
   buildShapingFaqs,
+  BAND_TITLE_TEXT,
+  CAVEAT_TEXT,
+  CHART_INTRO_TEXT,
+  FORMULA_TIMES_LABEL,
+  IDEA_TEXT,
   breakdownFormula,
   chartCellNote,
   segmentLengths,
@@ -125,4 +130,15 @@ test("segmentLengths: 全探索で合計が段数・個数が回数・長短が�
     assert.equal(segs.filter((x) => x === p.base).length, shortCount(p));
     assert.equal(segs.filter((x) => x === p.base + 1).length, p.extra);
   }
+});
+
+test("固定文は意味を縛る語句をリテラルで固定する（検査が定数と自己参照にならないように）", () => {
+  assert.ok(CHART_INTRO_TEXT.includes("左の列が段数、上の行が回数です"));
+  assert.ok(CHART_INTRO_TEXT.includes("短い区切りと長い区切りを組み合わせて段数の合計に合わせます"));
+  assert.equal(FORMULA_TIMES_LABEL, "1回で動かす目数（両端あわせて）");
+  assert.ok(CAVEAT_TEXT.includes("編み図に指定があれば、そちらを優先してください"));
+  assert.ok(IDEA_TEXT.includes("1回で動かす目数で割ると回数です"));
+  assert.ok(IDEA_TEXT.includes("両端で1目ずつなら1回に2目動きます"));
+  assert.ok(IDEA_TEXT.includes("丈の段数を回数で割り"));
+  assert.ok(BAND_TITLE_TEXT.includes("数字が大きい帯が長い区切り"));
 });
