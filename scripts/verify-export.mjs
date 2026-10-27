@@ -953,7 +953,7 @@ function checkShapingPage(rel, html) {
   if (!text.includes(`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります`)) fail(`${rel}: 実例の区切りの文が計算と一致しない`);
   const timesFig = html.match(/data-spread-times="(\d+),(\d+)">\s*(\d+)/);
   if (!timesFig || Number(timesFig[1]) !== p.rows || Number(timesFig[2]) !== p.times || Number(timesFig[3]) !== p.times) fail(`${rel}: 結果カードの回数が計算と一致しない`);
-  const cardText = textOf(html.match(/1回の区切り<\/div>\s*<div class="result-figure__num">(.*?)<\/div>/s)?.[1] ?? "");
+  const cardText = textOf(html.match(/1回の区切り<\/div>\s*<div class="result-figure__num"[^>]*>(.*?)<\/div>/s)?.[1] ?? "");
   if (cardText !== `${chartCellText(p)}段`) fail(`${rel}: 結果カードの区切り「${cardText}」が計算「${chartCellText(p)}段」と違う`);
   if (!text.includes(breakdownFormula(p))) fail(`${rel}: 結果カードの内訳の式が計算「${breakdownFormula(p)}」と一致しない`);
   const segs = [...html.matchAll(/<li class="(spread-band__seg(?: is-long)?)" data-seg="(\d+)">(\d+)<\/li>/g)];

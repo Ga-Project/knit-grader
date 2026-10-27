@@ -15,7 +15,6 @@ import {
   BAND_TITLE_TEXT,
   CAVEAT_TEXT,
   CHART_INTRO_TEXT,
-  FORMULA_TIMES_LABEL,
   IDEA_TEXT,
   breakdownFormula,
   breakdownText,
@@ -123,7 +122,8 @@ export default function ShapingGuide() {
                 <span className="formula__op">＝</span>
                 <span className="nowrap">増減する目数</span>
                 <span className="formula__op">÷</span>
-                <span className="nowrap">{FORMULA_TIMES_LABEL}</span>
+                <span className="nowrap">1回で動かす目数</span>
+                <span className="nowrap">（両端あわせて）</span>
               </p>
               <p className="formula">
                 <span className="nowrap">1回の区切り</span>
@@ -190,7 +190,10 @@ export default function ShapingGuide() {
               </div>
               <div className="result-figure">
                 <div className="result-figure__label">1回の区切り</div>
-                <div className="result-figure__num">
+                <div
+                  className="result-figure__num"
+                  style={{ ["--n" as string]: chartCellText(p).length + 1 } as React.CSSProperties}
+                >
                   <span className="nowrap">
                     {chartCellText(p)}
                     <span className="result-figure__unit">段</span>

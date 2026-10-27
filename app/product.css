@@ -1147,3 +1147,7 @@ body {
 .faq__heading {
   margin-top: var(--sp-2);
 }
+#shaping-chart thead th:first-child,
+#shaping-chart tbody th {
+  width: 4.5rem;
+}
