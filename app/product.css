@@ -1074,3 +1074,80 @@ body {
 .no-bigint .bigint-note {
   display: block;
 }
+
+/* /shaping/: 区切りの帯と早見表の内訳 */
+.spread-band__title {
+  margin-top: var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+}
+.spread-band {
+  list-style: none;
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  display: grid;
+  grid-template-columns: repeat(var(--segs), minmax(0, 1fr));
+  gap: 2px;
+  background-color: var(--surface);
+  border: 1px solid var(--table-rule);
+  border-radius: var(--radius);
+  background-image:
+    repeating-linear-gradient(0deg, var(--border) 0 1px, transparent 1px var(--cell)),
+    repeating-linear-gradient(90deg, var(--border) 0 1px, transparent 1px var(--cell));
+}
+.spread-band__seg {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-black);
+  line-height: 2.75rem;
+  background: var(--accent-tint);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.spread-band__seg.is-long {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.result-figure__note {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.guide-result {
+  margin-top: var(--sp-5);
+}
+#shaping-chart {
+  table-layout: fixed;
+  min-width: 42rem;
+}
+#shaping-chart .spread-cell__main {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: var(--fw-bold);
+}
+#shaping-chart .spread-cell__note {
+  display: block;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+}
+#shaping-chart td.is-mixed {
+  background: var(--accent-tint);
+  border-bottom: 2px solid var(--accent);
+}
+#shaping-chart td,
+#shaping-chart thead th {
+  text-align: center;
+}
+.faq__heading {
+  margin-top: var(--sp-2);
+}
+#shaping-chart thead th:first-child,
+#shaping-chart tbody th {
+  width: 4.5rem;
+}

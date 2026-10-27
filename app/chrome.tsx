@@ -6,6 +6,7 @@ import Link from "next/link";
 import { StitchMark } from "./StitchMark";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
 import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
+import { SHAPING_GUIDE_PATH } from "@/lib/shaping-guide";
 
 export function SiteHeader() {
   return (
@@ -26,7 +27,7 @@ export function SiteHeader() {
 
 interface SiteFooterProps {
   /** 表示中のページ。そのページへのリンクに aria-current="page" を付ける。 */
-  current?: "gauge" | "swatch" | "privacy";
+  current?: "gauge" | "swatch" | "shaping" | "privacy";
 }
 
 export function SiteFooter({ current }: SiteFooterProps = {}) {
@@ -54,6 +55,14 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
               aria-current={current === "swatch" ? "page" : undefined}
             >
               <Words text="ゲージの測り方" />
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={SHAPING_GUIDE_PATH}
+              aria-current={current === "shaping" ? "page" : undefined}
+            >
+              <Words text="増し目・減らし目の間隔の出し方" />
             </Link>
           </li>
           <li>

@@ -20,6 +20,9 @@
 //     - FAQPage（3〜4件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
 //     - 実例の表示値（data-per10）が per10cmFromCount と一致、換算式の＝／≈が計算結果と一致
 //     - 換算部品の入力欄が空状態で描画され、/gauge/ ・トップへ相互リンクがある
+//   /shaping/
+//     - FAQPage（3件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
+//     - 早見表の各セル（data-spread）が spreadPlan と一致、実例の回数・段数・内訳が関数と一致
 //   トップ
 //     - GoatCounter タグ・SoftwareApplication JSON-LD・/gauge/ への導線
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -39,6 +42,7 @@ import {
   per10cmText,
   SWATCH_GUIDE_PATH,
 } from "../lib/swatch-guide.ts";
+import { CHART_ROWS, CHART_TIMES, SHAPING_GUIDE_PATH, BAND_TITLE_TEXT, CAVEAT_TEXT, CHART_INTRO_TEXT, FORMULA_TIMES_LABEL, IDEA_TEXT, breakdownFormula, breakdownText, buildShapingExample, chartCellNote, chartCellText, segmentLengths, exampleIntroText, intervalText, spreadPlan, timesFaqAnswer, totalRows } from "../lib/shaping-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
 
@@ -47,6 +51,7 @@ const BASE_PATH = new URL(SITE_URL).pathname.replace(/\/$/, "");
 const SITE_ORIGIN = new URL(SITE_URL).origin;
 const GAUGE_URL = new URL(GAUGE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 const SWATCH_URL = new URL(SWATCH_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
+const SHAPING_URL = new URL(SHAPING_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 
 /**
  * 外部から読み込んでよいホスト（script・stylesheet・preload・iframe・img 等の読み込み系すべて）。
@@ -411,6 +416,7 @@ function checkGaugePage(rel, html) {
   for (const e of eq.errors) fail(`${rel}: 計算式の食い違い ${e}`);
 
   if (!html.includes(`href="${BASE_PATH}${SWATCH_GUIDE_PATH}"`)) fail(`${rel}: /swatch/ への導線が無い`);
+  if (!html.includes(`href="${BASE_PATH}${SHAPING_GUIDE_PATH}"`)) fail(`${rel}: /shaping/ への導線が無い`);
   checkQuickChart(rel, html);
   checkMarkers(rel, html);
   checkFinishedClaims(rel, html);
@@ -896,6 +902,124 @@ function checkSwatchPage(rel, html) {
   checkBigIntNote(rel, html);
 }
 
+/**
+ * /shaping/: JSON-LD・FAQ、早見表の各セル（data-spread の「段数,回数」から spreadPlan を引き直して表示と照合）、
+ * 実例の内訳の文（breakdownText と合計段数）が関数と一致するか。
+ */
+function checkShapingPage(rel, html) {
+  const text = visibleText(html);
+  // 表示されている文字だけを照合先にする（hidden / aria-hidden / visually-hidden の中の文字では満たさない）
+  const vis = flattenBody(html.replace(/<(\w+)\b[^>]*\shidden(?:=""|=hidden)?[^>]*>.*?<\/\1>/gs, "")).text.replace(/\u0001/g, "");
+  checkFaqAndCrumbs(rel, html, text, { pageUrl: SHAPING_URL, min: 3, max: 3 });
+  const cells = [...html.matchAll(/<td(?: class="is-mixed")? data-spread="(\d+),(\d+)">(.*?)<\/td>/g)];
+  if (cells.length !== CHART_ROWS.length * CHART_TIMES.length) fail(`${rel}: 早見表のセルが ${cells.length} 個（期待 ${CHART_ROWS.length * CHART_TIMES.length}）`);
+  const bodyRows = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/table>/s)?.[0] ?? "").matchAll(/<tr>(?:(?!<\/tr>).)*<th scope="row">(\d+)段<\/th>(.*?)<\/tr>/gs)];
+  if (bodyRows.length !== CHART_ROWS.length) fail(`${rel}: 早見表の行が ${bodyRows.length} 本（期待 ${CHART_ROWS.length}）`);
+  bodyRows.forEach((r, i) => {
+    const spreads = [...r[2].matchAll(/data-spread="(\d+),(\d+)"/g)].map((m) => `${m[1]},${m[2]}`);
+    const want = CHART_TIMES.map((t) => `${CHART_ROWS[i]},${t}`);
+    if (Number(r[1]) !== CHART_ROWS[i] || spreads.join("|") !== want.join("|")) fail(`${rel}: 早見表の ${i + 1} 行目（${r[1]}段）のセルの位置が行・列の見出しと合わない（${spreads.join("|")}）`);
+  });
+  for (const m of cells) {
+    const rowsN = Number(m[1]);
+    const timesN = Number(m[2]);
+    const shown = textOf(m[3]);
+    const note = shown.match(/^(\d+)〜(\d+) (\d+)×(\d+)＋(\d+)×(\d+)$/);
+    const plain = shown.match(/^(\d+)$/);
+    if (note) {
+      const [, lo, hi, a, b, c, d] = note.map(Number);
+      // 表示された文字だけで検算: 短い区切り a 段×b 回 ＋ 長い区切り c 段×d 回 が 段数・回数に一致し、c は a+1
+      if (hi !== lo + 1 || a !== lo || c !== hi || a * b + c * d !== rowsN || b + d !== timesN || b < 1 || d < 1) fail(`${rel}: 早見表 ${rowsN}段×${timesN}回の内訳「${shown}」が算術と合わない`);
+    } else if (plain) {
+      if (Number(plain[1]) * timesN !== rowsN) fail(`${rel}: 早見表 ${rowsN}段×${timesN}回の「${shown}」段ごとが算術と合わない`);
+    } else fail(`${rel}: 早見表 ${rowsN}段×${timesN}回の表示「${shown}」が読み取れない`);
+  }
+  const colHeads = [...(html.match(/<table[^>]*id="shaping-chart"[^>]*>.*?<\/thead>/s)?.[0] ?? "").matchAll(/<th scope="col">(.*?)<\/th>/g)].map((m) => textOf(m[1]));
+  const wantCols = ["段数", ...CHART_TIMES.map((t) => `${t}回`)];
+  if (colHeads.join("|") !== wantCols.join("|")) fail(`${rel}: 早見表の列見出し「${colHeads.join("|")}」が定義「${wantCols.join("|")}」と違う`);
+  const rowHeads = [...html.matchAll(/<th scope="row">(\d+)段<\/th>/g)].map((m) => Number(m[1]));
+  if (rowHeads.join(",") !== CHART_ROWS.join(",")) fail(`${rel}: 早見表の行見出し「${rowHeads.join(",")}」が定義「${CHART_ROWS.join(",")}」と違う`);
+  for (const m of cells) {
+    const col = CHART_TIMES.indexOf(Number(m[2]));
+    const rowI = CHART_ROWS.indexOf(Number(m[1]));
+    if (col < 0 || rowI < 0) fail(`${rel}: 早見表のセル ${m[1]},${m[2]} が見出しの定義に無い`);
+  }
+  for (const m of cells) {
+    const p = spreadPlan(Number(m[1]), Number(m[2]));
+    if (p === null) fail(`${rel}: 早見表のセル ${m[1]},${m[2]} が不正`);
+    else {
+      if (textOf(m[3]) !== `${chartCellText(p)}${chartCellNote(p) ? " " + chartCellNote(p) : ""}`) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の表示「${textOf(m[3])}」が計算「${chartCellText(p)} ${chartCellNote(p)}」と違う`);
+      const mixedClass = m[0].startsWith('<td class="is-mixed"');
+      if (mixedClass !== (p.extra !== 0)) fail(`${rel}: 早見表 ${m[1]}段×${m[2]}回の「組み合わせ」の印が計算と食い違う`);
+    }
+  }
+  const ex = buildShapingExample();
+  const p = ex.plan;
+  if (totalRows(p) !== p.rows) fail(`${rel}: 内訳の合計が段数と一致しない`);
+  if (!vis.includes(`内訳は${breakdownText(p)}で、合わせて${p.rows}段です`)) fail(`${rel}: 実例の内訳の文が計算と一致しない`);
+  if (!html.includes(`data-calc="${ex.rowGauge},${ex.lengthCm}"`) || !vis.includes(`＝ ${ex.rows}段`)) fail(`${rel}: 実例の段数が計算と一致しない`);
+  if (!vis.includes(`＝ ${ex.times}回`)) fail(`${rel}: 実例の回数が計算と一致しない`);
+  // 本文の主張を、関数を使わず文面の数字だけで検算する（関数と表示が一致したまま意味が誤る退行を検出する）
+  const claim = vis.match(/(\d+)目から(\d+)目まで増やします。両端で(\d+)目ずつ、1回に(\d+)目増やす/);
+  if (!claim) fail(`${rel}: 実例の前提の文が読み取れない`);
+  else {
+    const [, a, b, side, per] = claim.map(Number);
+    if (per !== side * 2) fail(`${rel}: 「両端で${side}目ずつ」と「1回に${per}目」が食い違う`);
+    const calc = vis.match(/\((\d+) − (\d+)\) ÷ (\d+) ＝ (\d+)回/);
+    if (!calc) fail(`${rel}: 回数の計算式が読み取れない`);
+    else {
+      const [, e, st, d, n] = calc.map(Number);
+      if (e !== b || st !== a || d !== per || n * d !== e - st) fail(`${rel}: 回数の計算式（${e}−${st}）÷${d}＝${n} が前提の文と合わない`);
+    }
+  }
+  if (!vis.includes(exampleIntroText(ex))) fail(`${rel}: 実例の前提の文が関数の出力と一致しない`);
+  if (!vis.includes(`${p.rows}段を${p.times}回に分けると、${intervalText(p)}になります`)) fail(`${rel}: 実例の区切りの文が計算と一致しない`);
+  const calcSt = vis.match(/(\d+) ÷ 10 × (\d+) ＝ (\d+)段/);
+  if (!calcSt) fail(`${rel}: 段数の計算式が読み取れない`);
+  else {
+    const [, len, gg, n] = calcSt.map(Number);
+    if (len !== ex.lengthCm || gg !== ex.rowGauge || Math.round((len * gg) / 10) !== n || n !== ex.rows) fail(`${rel}: 段数の計算式 ${len}÷10×${gg}＝${n} が前提と合わない`);
+  }
+  for (const f of ["回数＝増減する目数÷1回で動かす目数（両端あわせて）", "1回の区切り＝段数÷回数", "各区切りの最後の段で、目を増やす（減らす）ものとして数えます。"]) {
+    if (!vis.includes(f)) fail(`${rel}: 式の枠「${f}」が一致しない`);
+  }
+  const cardFormula = vis.match(/(\d+)段×(\d+)回(?:＋(\d+)段×(\d+)回)?/);
+  if (!cardFormula) fail(`${rel}: 結果カードの内訳式が読み取れない`);
+  else {
+    const [, a, b, c, d] = cardFormula;
+    const sum = Number(a) * Number(b) + (c ? Number(c) * Number(d) : 0);
+    const cnt = Number(b) + (d ? Number(d) : 0);
+    if (sum !== p.rows || cnt !== p.times || (c && Number(c) !== Number(a) + 1)) fail(`${rel}: 結果カードの内訳式が文面の算術と合わない`);
+  }
+  const timesFig = html.match(/data-spread-times="(\d+),(\d+)">\s*(\d+)/);
+  if (!timesFig || Number(timesFig[1]) !== p.rows || Number(timesFig[2]) !== p.times || Number(timesFig[3]) !== p.times) fail(`${rel}: 結果カードの回数が計算と一致しない`);
+  const timesCard = textOf(html.match(/<div class="result-figure__label">回数<\/div>\s*<div class="result-figure__num"[^>]*>(.*?)<\/div>/s)?.[1] ?? "");
+  if (timesCard !== `${p.times}回`) fail(`${rel}: 結果カードの回数の表示「${timesCard}」が「${p.times}回」と違う`);
+  const cardText = textOf(html.match(/1回の区切り<\/div>\s*<div class="result-figure__num"[^>]*>(.*?)<\/div>/s)?.[1] ?? "");
+  if (cardText !== `${chartCellText(p)}段`) fail(`${rel}: 結果カードの区切り「${cardText}」が計算「${chartCellText(p)}段」と違う`);
+  if (!vis.includes(breakdownFormula(p))) fail(`${rel}: 結果カードの内訳の式が計算「${breakdownFormula(p)}」と一致しない`);
+  const segs = [...html.matchAll(/<li class="(spread-band__seg(?: is-long)?)" data-seg="(\d+)">(\d+)<\/li>/g)];
+  if (segs.map((m) => Number(m[2])).join(",") !== segmentLengths(p).join(",") || segs.some((m) => m[2] !== m[3])) fail(`${rel}: 区切りの帯が計算と一致しない`);
+  if (segs.reduce((a, m) => a + Number(m[2]), 0) !== p.rows) fail(`${rel}: 区切りの帯の合計が段数と一致しない`);
+  for (const m of segs) {
+    if (m[1].includes("is-long") !== (Number(m[2]) !== p.base)) fail(`${rel}: 区切り ${m[2]} 段の濃淡が長短と食い違う`);
+  }
+  const bandOpen = html.match(/<ol class="spread-band" aria-label="([^"]*)" style="([^"]*)">/);
+  if (!bandOpen) fail(`${rel}: 区切りの帯の開始タグが読み取れない`);
+  else {
+    if (bandOpen[1] !== `${p.rows}段を${p.times}回に分けた区切りの段数`) fail(`${rel}: 帯の aria-label「${bandOpen[1]}」が計算と一致しない`);
+    if (!new RegExp(`^\\s*--segs:\\s*${segs.length}\\s*;?\\s*$`).test(bandOpen[2]) || segs.length !== p.times) fail(`${rel}: 帯の列数（--segs）が区切りの数と一致しない`);
+  }
+  for (const [name, want] of [["考え方の段落", IDEA_TEXT], ["目安の断り書き", CAVEAT_TEXT], ["早見表の説明", CHART_INTRO_TEXT], ["帯の見出し", BAND_TITLE_TEXT], ["式の注記", FORMULA_TIMES_LABEL]]) {
+    if (!vis.includes(want)) fail(`${rel}: ${name}が定義した文と一致しない`);
+  }
+  const idea = IDEA_TEXT.match(/両端で(\d+)目ずつなら1回に(\d+)目/);
+  if (!idea || Number(idea[2]) !== Number(idea[1]) * 2) fail(`${rel}: 考え方の段落の「両端で◯目ずつなら1回に◯目」が整合しない`);
+  const faqAnswers = [...html.matchAll(/"acceptedAnswer":\{"@type":"Answer","text":"(.*?)"\}/g)].map((m) => m[1]);
+  if (!faqAnswers.some((a) => a.includes(timesFaqAnswer(ex)))) fail(`${rel}: FAQ の回数の回答が関数の出力と一致しない`);
+  if (!html.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: /gauge/ への導線が無い`);
+}
+
 function checkTopPage(rel, html) {
   if (!html.includes(`https://${GOATCOUNTER_CODE}.goatcounter.com/count`)) {
     fail(`${rel}: GoatCounter のカウント先（${GOATCOUNTER_CODE}）が無い`);
@@ -936,6 +1060,7 @@ function main() {
   if (!locs.includes(GAUGE_URL)) fail(`sitemap.xml: ${GAUGE_URL} が無い`);
   if (!locs.includes(SITE_URL)) fail(`sitemap.xml: ${SITE_URL} が無い`);
   if (!locs.includes(SWATCH_URL)) fail(`sitemap.xml: ${SWATCH_URL} が無い`);
+  if (!locs.includes(SHAPING_URL)) fail(`sitemap.xml: ${SHAPING_URL} が無い`);
   if (new Set(locs).size !== locs.length) fail("sitemap.xml: URL が重複している");
 
   for (const rel of files) {
@@ -944,7 +1069,7 @@ function main() {
     checkNoPaidTerms(rel, html);
     checkPhraseBoundaries(rel, html);
     const flat = flattenBody(html);
-    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
+    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge|shaping)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
     checkFlexChildren(rel, flat.root, FLEX_SELECTORS);
     for (const t of flat.inlineFlex) fail(`${rel}: インライン style の display が flex/grid 系（検査が追えない。class と CSS の規則にすること）: ${t}`);
   }
@@ -973,6 +1098,9 @@ function main() {
   const swatch = byUrl.get(SWATCH_URL);
   if (swatch) checkSwatchPage(swatch, readFileSync(join(OUT_DIR, swatch), "utf8"));
   else fail(`${SWATCH_URL} のページが out/ に無い`);
+  const shaping = byUrl.get(SHAPING_URL);
+  if (shaping) checkShapingPage(shaping, readFileSync(join(OUT_DIR, shaping), "utf8"));
+  else fail(`${SHAPING_URL} のページが out/ に無い`);
   const top = byUrl.get(SITE_URL);
   if (top) checkTopPage(top, readFileSync(join(OUT_DIR, top), "utf8"));
   else fail("トップの index.html が無い");
