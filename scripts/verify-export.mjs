@@ -23,6 +23,9 @@
 //   /shaping/
 //     - FAQPage（3件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
 //     - 早見表の各セル（data-spread）が spreadPlan と一致、実例の回数・段数・内訳が関数と一致
+//   /needles/
+//     - FAQPage（3〜5件）/ BreadcrumbList JSON-LD、FAQ の Q/A が本文と一致
+//     - 号数表の各行（号数・mm・太さのイメージの棒の高さ）・針の替え方の表の各行が lib/needle-guide の表と一致し、太さが号数順に増える
 //   トップ
 //     - GoatCounter タグ・SoftwareApplication JSON-LD・/gauge/ への導線
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -42,6 +45,7 @@ import {
   per10cmText,
   SWATCH_GUIDE_PATH,
 } from "../lib/swatch-guide.ts";
+import { CROCHET_HOOKS, KNITTING_NEEDLES, NEEDLE_GUIDE_PATH, SWAP_RULES, barHeightPx, mmText } from "../lib/needle-guide.ts";
 import { CHART_ROWS, CHART_TIMES, SHAPING_GUIDE_PATH, BAND_TITLE_TEXT, CAVEAT_TEXT, CHART_INTRO_TEXT, FORMULA_TIMES_LABEL, IDEA_TEXT, breakdownFormula, breakdownText, buildShapingExample, chartCellNote, chartCellText, segmentLengths, exampleIntroText, intervalText, spreadPlan, timesFaqAnswer, totalRows } from "../lib/shaping-guide.ts";
 
 const OUT_DIR = fileURLToPath(new URL("../out/", import.meta.url));
@@ -52,6 +56,7 @@ const SITE_ORIGIN = new URL(SITE_URL).origin;
 const GAUGE_URL = new URL(GAUGE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 const SWATCH_URL = new URL(SWATCH_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 const SHAPING_URL = new URL(SHAPING_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
+const NEEDLES_URL = new URL(NEEDLE_GUIDE_PATH.replace(/^\//, ""), SITE_URL).toString();
 
 /**
  * 外部から読み込んでよいホスト（script・stylesheet・preload・iframe・img 等の読み込み系すべて）。
@@ -417,6 +422,7 @@ function checkGaugePage(rel, html) {
 
   if (!html.includes(`href="${BASE_PATH}${SWATCH_GUIDE_PATH}"`)) fail(`${rel}: /swatch/ への導線が無い`);
   if (!html.includes(`href="${BASE_PATH}${SHAPING_GUIDE_PATH}"`)) fail(`${rel}: /shaping/ への導線が無い`);
+  if (!elementInner(html, "main").includes(`href="${BASE_PATH}${NEEDLE_GUIDE_PATH}"`)) fail(`${rel}: 本文（main）に /needles/ への導線が無い（フッターのリンクだけでは足りない）`);
   checkQuickChart(rel, html);
   checkMarkers(rel, html);
   checkFinishedClaims(rel, html);
@@ -1039,6 +1045,73 @@ function checkTopPage(rel, html) {
   }
 }
 
+/** 最初の <tag>…</tag> の中身（無ければ空文字）。導線の検査を、本文とフッターに分けて行うために使う。 */
+function elementInner(html, tag) {
+  return html.match(new RegExp(`<${tag}\\b[^>]*>(.*?)</${tag}>`, "s"))?.[1] ?? "";
+}
+
+/**
+ * /needles/: JSON-LD・FAQ、号数表の各行（号数・mm・太さのイメージの棒の高さ）・針の替え方の表の各行が lib/needle-guide の表と一致するか。
+ * 表の並び（号数順・太さが単調に増える）も書き出した HTML から確かめる。
+ */
+function checkNeedlesPage(rel, html) {
+  const text = visibleText(html);
+  checkFaqAndCrumbs(rel, html, text, { pageUrl: NEEDLES_URL, min: 3, max: 5 });
+  for (const [id, list] of [["knitting-chart", KNITTING_NEEDLES], ["crochet-chart", CROCHET_HOOKS]]) {
+    const table = html.match(new RegExp(`<table[^>]*\\sid="${id}"[^>]*>(.*?)</table>`, "s"))?.[1];
+    if (!table) {
+      fail(`${rel}: 号数表（#${id}）が無い`);
+      continue;
+    }
+    if (!/<caption[\s>]/.test(table)) fail(`${rel}: #${id} に caption が無い`);
+    const heads = [...(table.match(/<thead>(.*?)<\/thead>/s)?.[1] ?? "").matchAll(/<th\b([^>]*)>/g)];
+    if (heads.length !== 2 || heads.some((h) => !/\sscope="col"/.test(h[1]))) fail(`${rel}: #${id} の列見出しに scope="col" が無い`);
+    const rows = [...(table.match(/<tbody>(.*?)<\/tbody>/s)?.[1] ?? "").matchAll(/<tr[^>]*>(.*?)<\/tr>/gs)];
+    if (rows.length !== list.length) fail(`${rel}: #${id} の行が ${rows.length} 行（期待 ${list.length}）`);
+    let prev = 0;
+    rows.forEach((row, i) => {
+      const n = list[i];
+      if (!n) return;
+      const th = row[1].match(/<th\b([^>]*)>(.*?)<\/th>/s);
+      if (!th || !/\sscope="row"/.test(th[1])) fail(`${rel}: #${id} の ${i + 1} 行目の行見出しに scope="row" が無い`);
+      if (textOf(th?.[2] ?? "") !== n.label) fail(`${rel}: #${id} の ${i + 1} 行目の号数「${textOf(th?.[2] ?? "")}」（期待 ${n.label}）`);
+      const td = row[1].match(/<td\b([^>]*)>(.*?)<\/td>/s);
+      const shown = textOf((td?.[2] ?? "").replace(/<span\b[^>]*aria-hidden[^>]*>.*?<\/span>/gs, ""));
+      if (shown !== mmText(n.mm)) fail(`${rel}: #${id} の ${n.label} の太さ「${shown}」（期待 ${mmText(n.mm)}）`);
+      const height = Number(td?.[2].match(/height:\s*([\d.]+)px/)?.[1]);
+      if (height !== barHeightPx(n.mm)) fail(`${rel}: #${id} の ${n.label} の棒の高さ ${height}px（期待 ${barHeightPx(n.mm)}px）`);
+      const mm = Number(shown.replace("mm", ""));
+      if (!(mm > prev)) fail(`${rel}: #${id} の ${n.label} の太さが前の行より増えていない`);
+      prev = mm;
+    });
+  }
+  // 針の替え方の表: 3列（目数の比べ・編み地・針）の各行が SWAP_RULES と一致し、文章の列は折り返し・左揃えの class を持つ表
+  const swap = html.match(/<table[^>]*\sid="swap-table"[^>]*>(.*?)<\/table>/s);
+  if (!swap) fail(`${rel}: 針の替え方の表（#swap-table）が無い`);
+  else {
+    if (!/<table[^>]*class="[^"]*\bswap-table\b/.test(swap[0])) fail(`${rel}: #swap-table に swap-table クラスが無い（文章の列が切れる）`);
+    const heads = [...(swap[1].match(/<thead>(.*?)<\/thead>/s)?.[1] ?? "").matchAll(/<th\b([^>]*)>/g)];
+    if (heads.length !== 3 || heads.some((h) => !/\sscope="col"/.test(h[1]))) fail(`${rel}: #swap-table の列見出しに scope="col" が無い`);
+    const rows = [...(swap[1].match(/<tbody>(.*?)<\/tbody>/s)?.[1] ?? "").matchAll(/<tr[^>]*>(.*?)<\/tr>/gs)];
+    if (rows.length !== SWAP_RULES.length) fail(`${rel}: #swap-table の行が ${rows.length} 行（期待 ${SWAP_RULES.length}）`);
+    rows.forEach((row, i) => {
+      const r = SWAP_RULES[i];
+      if (!r) return;
+      const th = row[1].match(/<th\b([^>]*)>(.*?)<\/th>/s);
+      const tds = [...row[1].matchAll(/<td\b[^>]*>(.*?)<\/td>/gs)].map((c) => textOf(c[1]));
+      if (!th || !/\sscope="row"/.test(th[1])) fail(`${rel}: #swap-table の ${i + 1} 行目の行見出しに scope="row" が無い`);
+      if (textOf(th?.[2] ?? "") !== r.gauge || tds[0] !== r.state || tds[1] !== r.action) {
+        fail(`${rel}: #swap-table の ${i + 1} 行目「${textOf(th?.[2] ?? "")} / ${tds.join(" / ")}」が SWAP_RULES と一致しない`);
+      }
+    });
+  }
+  // 本文（main）の中のリンク。ヘッダー・フッターの共通リンクでは満たさない
+  const main = elementInner(html, "main");
+  if (!main.includes(`href="${BASE_PATH}${GAUGE_GUIDE_PATH}"`)) fail(`${rel}: 本文（main）に /gauge/ への導線が無い`);
+  if (!main.includes(`href="${BASE_PATH}${SWATCH_GUIDE_PATH}"`)) fail(`${rel}: 本文（main）に /swatch/ への導線が無い`);
+  if (!main.includes(`href="${BASE_PATH}/"`)) fail(`${rel}: 本文（main）にトップへの導線が無い`);
+}
+
 // ---------------------------------------------------------------------------
 // 実行
 // ---------------------------------------------------------------------------
@@ -1061,15 +1134,19 @@ function main() {
   if (!locs.includes(SITE_URL)) fail(`sitemap.xml: ${SITE_URL} が無い`);
   if (!locs.includes(SWATCH_URL)) fail(`sitemap.xml: ${SWATCH_URL} が無い`);
   if (!locs.includes(SHAPING_URL)) fail(`sitemap.xml: ${SHAPING_URL} が無い`);
+  if (!locs.includes(NEEDLES_URL)) fail(`sitemap.xml: ${NEEDLES_URL} が無い`);
   if (new Set(locs).size !== locs.length) fail("sitemap.xml: URL が重複している");
 
   for (const rel of files) {
     const html = readFileSync(join(OUT_DIR, rel), "utf8");
     checkCommon(rel, html);
+    if (!/(^|[\\/])404(\.html|[\\/]index\.html)$/.test(rel) && !elementInner(html, "footer").includes(`href="${BASE_PATH}${NEEDLE_GUIDE_PATH}"`)) {
+      fail(`${rel}: フッター（footer）に /needles/ への導線が無い`);
+    }
     checkNoPaidTerms(rel, html);
     checkPhraseBoundaries(rel, html);
     const flat = flattenBody(html);
-    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge|shaping)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
+    if (checkCoreWordInvariant(rel, html, flat) === 0 && /(^|\/)(swatch|gauge|shaping|needles)\//.test(rel)) fail(`${rel}: 核語の塊（nowrap core）が 1 つも無い`);
     checkFlexChildren(rel, flat.root, FLEX_SELECTORS);
     for (const t of flat.inlineFlex) fail(`${rel}: インライン style の display が flex/grid 系（検査が追えない。class と CSS の規則にすること）: ${t}`);
   }
@@ -1101,6 +1178,9 @@ function main() {
   const shaping = byUrl.get(SHAPING_URL);
   if (shaping) checkShapingPage(shaping, readFileSync(join(OUT_DIR, shaping), "utf8"));
   else fail(`${SHAPING_URL} のページが out/ に無い`);
+  const needles = byUrl.get(NEEDLES_URL);
+  if (needles) checkNeedlesPage(needles, readFileSync(join(OUT_DIR, needles), "utf8"));
+  else fail(`${NEEDLES_URL} のページが out/ に無い`);
   const top = byUrl.get(SITE_URL);
   if (top) checkTopPage(top, readFileSync(join(OUT_DIR, top), "utf8"));
   else fail("トップの index.html が無い");

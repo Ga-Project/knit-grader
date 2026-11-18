@@ -7,6 +7,7 @@ import { StitchMark } from "./StitchMark";
 import { GAUGE_GUIDE_PATH } from "@/lib/gauge-guide";
 import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
 import { SHAPING_GUIDE_PATH } from "@/lib/shaping-guide";
+import { NEEDLE_GUIDE_PATH } from "@/lib/needle-guide";
 
 export function SiteHeader() {
   return (
@@ -27,7 +28,7 @@ export function SiteHeader() {
 
 interface SiteFooterProps {
   /** 表示中のページ。そのページへのリンクに aria-current="page" を付ける。 */
-  current?: "gauge" | "swatch" | "shaping" | "privacy";
+  current?: "gauge" | "swatch" | "shaping" | "needles" | "privacy";
 }
 
 export function SiteFooter({ current }: SiteFooterProps = {}) {
@@ -63,6 +64,14 @@ export function SiteFooter({ current }: SiteFooterProps = {}) {
               aria-current={current === "shaping" ? "page" : undefined}
             >
               <Words text="増し目・減らし目の間隔の出し方" />
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={NEEDLE_GUIDE_PATH}
+              aria-current={current === "needles" ? "page" : undefined}
+            >
+              <Words text="棒針・かぎ針の号数対応表" />
             </Link>
           </li>
           <li>

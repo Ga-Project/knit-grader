@@ -28,6 +28,7 @@ import {
 } from "@/lib/json-ld";
 import { SWATCH_GUIDE_PATH } from "@/lib/swatch-guide";
 import { SHAPING_GUIDE_PATH } from "@/lib/shaping-guide";
+import { NEEDLE_GUIDE_PATH } from "@/lib/needle-guide";
 import { QuickChart } from "./QuickChart";
 
 const PAGE_NAME = "ゲージから目数・段数を出す方法";
@@ -310,6 +311,11 @@ export default function GaugeGuide() {
             </p>
             <p>
               <Words text="ただし出し直しで保てるのは寸法で、編み地の詰まり具合は指定とは変わります。針や糸を替えてゲージを指定に近づける方法もあります。どちらを優先するかは作品に合わせて決めてください。" />
+            </p>
+            <p className="faq__more">
+              <Link href={NEEDLE_GUIDE_PATH}>
+                <Words text="棒針・かぎ針の号数とミリ数の対応表" />
+              </Link>
             </p>
           </div>
         </section>

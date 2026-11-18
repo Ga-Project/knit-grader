@@ -1151,3 +1151,35 @@ body {
 #shaping-chart tbody th {
   width: 4.5rem;
 }
+
+/* 針の号数表: 太さのイメージの棒。長さは一定で、太い針ほど棒が太い（高さ = 太さ × 3.5px の共通縮尺・実寸ではない）。
+   値のすぐ右に置く。上下の負の余白で行ボックスの高さに影響させず、行の高さ（line-height 24px + padding）を整数 px のまま保つ */
+.needle-chart thead th:last-child,
+.needle-chart td {
+  text-align: left;
+  min-width: 11rem;
+}
+.needle-bar {
+  display: inline-block;
+  width: 56px;
+  margin: -8px 0 -8px var(--sp-3);
+  vertical-align: middle;
+  background: var(--accent);
+  border-radius: 999px;
+}
+@media (forced-colors: active) {
+  .needle-bar {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+}
+
+/* 針の替え方の表: 文章のセルなので折り返し、左揃えにする（数値用の右揃え・等幅・折り返し禁止を打ち消す） */
+.swap-table td {
+  white-space: normal;
+  text-align: left;
+  font-family: inherit;
+}
+.swap-table thead th {
+  text-align: left;
+}
